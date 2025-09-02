@@ -1,0 +1,4 @@
+# ops/seeds/students.csv
+id,name,roll_no,class_section_id,parent_email
+1,Anjali Singh,1A-001,1,parent1@example.com
+2,Rahul Sharma,1A-002,1,parent2@example.com

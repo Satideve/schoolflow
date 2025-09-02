@@ -1,0 +1,27 @@
+# infra/Dockerfile.backend
+
+# 1. Start from a slim Python base
+FROM python:3.13-slim
+
+# 2. Install system tooling (curl for Poetry installer, build-essential for any C-builds)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      curl build-essential \
+ && rm -rf /var/lib/apt/lists/*
+
+# 3. Install Poetry via pip (so we get the 'poetry' CLI)
+RUN pip install "poetry>=1.8"
+
+# 4. Set our working directory inside the container
+WORKDIR /app/backend
+
+# 5. Copy only the lockfiles first and install all deps (including dev, so alembic is in)
+COPY ../backend/pyproject.toml ../backend/poetry.lock ./
+RUN poetry config virtualenvs.create false \
+ && poetry install --no-root
+
+# 6. Copy the rest of your backend code (models, alembic.ini, .env, migrations/, app/)
+COPY ../backend ./
+
+# 7. Placeholder command to keep container alive for exec’ing migrations
+CMD ["sleep", "infinity"]

@@ -1,0 +1,3 @@
+# ops/seeds/seed_fees.csv
+fee_plan_name,academic_year,frequency
+Standard-IX-2025,2025,monthly

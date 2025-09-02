@@ -1,0 +1,38 @@
+# infra/docker-compose.yml
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: schoolflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ..                   # ← go up one level: project root
+      dockerfile: infra/Dockerfile.backend   
+    restart: on-failure
+    working_dir: /app/backend
+    volumes:
+      - ../backend:/app/backend:rw # mount your entire backend folder
+    environment:
+      DATABASE_URL: postgresql+psycopg2://admin:admin@db:5432/schoolflow
+    depends_on:
+      - db
+    command: sleep infinity       # keep container alive for exec; replace later
+
+  mailhog:
+    image: mailhog/mailhog
+    restart: always
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  pgdata:
