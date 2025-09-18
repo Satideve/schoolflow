@@ -20,10 +20,9 @@ services:
     restart: on-failure
     working_dir: /app/backend
     volumes:
-      - ../backend:/app/backend:rw         # mount your backend folder
-      - ../ops:/app/backend/ops:rw         # mount your ops scripts
-      - ../backend/app/data/receipts:/tmp/receipts  # use backend's data/receipts
-      - ../.env:/app/backend/.env:ro
+      - ../backend:/app/backend:rw  # mount your backend folder
+      - ../ops:/app/backend/ops:rw  # mount your ops scripts
+      - ./data/receipts:/tmp/receipts
     env_file:
       - ../.env
     depends_on:

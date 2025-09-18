@@ -1,27 +1,67 @@
 # infra/Dockerfile.backend
 
-# 1. Start from a slim Python base
-FROM python:3.13-slim
+# Stage 1: Get patched wkhtmltopdf from Alpine image
+FROM surnet/alpine-wkhtmltopdf:3.12.4-0.12.6-full AS wkhtmltopdf
 
-# 2. Install system tooling (curl for Poetry installer, build-essential for any C-builds)
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-      curl build-essential \
- && rm -rf /var/lib/apt/lists/*
+# Stage 2: Python 3.13 base with Alpine
+FROM python:3.13-alpine
 
-# 3. Install Poetry via pip (so we get the 'poetry' CLI)
-RUN pip install "poetry>=1.8"
+# 1. Copy wkhtmltopdf binary from stage 1
+# Copy binaries and libs from the Alpine wkhtmltopdf stage
+COPY --from=wkhtmltopdf /bin/wkhtmltopdf /bin/wkhtmltopdf
+COPY --from=wkhtmltopdf /bin/wkhtmltoimage /bin/wkhtmltoimage
+COPY --from=wkhtmltopdf /bin/libwkhtmltox* /bin/
+COPY --from=wkhtmltopdf /lib/libwkhtmltox* /lib/
+# Bring required OpenSSL 1.1 runtime libs from the wkhtmltopdf stage
+COPY --from=wkhtmltopdf /lib/libssl.so.1.1 /lib/libssl.so.1.1
+COPY --from=wkhtmltopdf /lib/libcrypto.so.1.1 /lib/libcrypto.so.1.1
 
-# 4. Set our working directory inside the container
+# Point pdfkit to the correct binary path
+ENV WKHTMLTOPDF_CMD=/bin/wkhtmltopdf
+
+
+# 2. Install system dependencies
+RUN apk add --no-cache \
+      fontconfig \
+      ttf-dejavu \
+      ttf-freefont \
+      libstdc++ \
+      libxrender \
+      libxext \
+      libx11 \
+      libxinerama \
+      curl \
+      build-base \
+      libffi-dev \
+      openssl-dev \
+      py3-pip \
+      py3-setuptools \
+      py3-wheel \
+ && pip install --upgrade pip
+
+# 3. Install Poetry using pipx to isolate it from project dependencies
+RUN pip install pipx \
+ && pipx install poetry \
+ && ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+
+# 4. Tell pdfkit where wkhtmltopdf lives
+ENV WKHTMLTOPDF_CMD=/usr/bin/wkhtmltopdf
+
+# 5. Set working directory inside the container
 WORKDIR /app/backend
 
-# 5. Copy only the lockfiles first and install all deps (including dev, so alembic is in)
+# 6. Copy lockfiles and install Python dependencies (including dev)
 COPY ../backend/pyproject.toml ../backend/poetry.lock ./
 RUN poetry config virtualenvs.create false \
  && poetry install --no-root
 
-# 6. Copy the rest of your backend code (models, alembic.ini, .env, migrations/, app/)
+# 7. Copy the rest of the backend source code
 COPY ../backend ./
 
-# 7. Placeholder command to keep container alive for exec’ing migrations
+# 8. Drop privileges: create and switch to a non-root user
+RUN addgroup --system appgroup \
+ && adduser --system --ingroup appgroup appuser
+USER appuser
+
+# 9. Keep the container alive for exec’ing migrations or debugging
 CMD ["sleep", "infinity"]

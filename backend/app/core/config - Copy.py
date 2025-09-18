@@ -3,13 +3,12 @@
 """
 Configuration for SchoolFlow using Pydantic BaseSettings.
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 from pydantic import Field, AnyUrl
 from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load .env manually for dotenv-aware tools (optional but safe)
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 
@@ -24,11 +23,17 @@ class Settings(BaseSettings):
 
     # JWT / Security
     secret_key: str = Field(..., env="SECRET_KEY")
-    access_token_expire_minutes: int = Field(60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
-    refresh_token_expire_days: int = Field(7, env="REFRESH_TOKEN_EXPIRE_DAYS")
+    access_token_expire_minutes: int = Field(
+        60, env="ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
+    refresh_token_expire_days: int = Field(
+        7, env="REFRESH_TOKEN_EXPIRE_DAYS"
+    )
 
     # wkhtmltopdf: path to the binary inside the container
-    wkhtmltopdf_cmd: Optional[str] = Field(None, env="WKHTMLTOPDF_CMD")
+    wkhtmltopdf_cmd: Optional[str] = Field(
+        None, env="WKHTMLTOPDF_CMD"
+    )
 
     # SMTP (MailHog default)
     smtp_host: str = Field("localhost", env="SMTP_HOST")
@@ -41,14 +46,14 @@ class Settings(BaseSettings):
     provider_mode: str = Field("fake", env="PROVIDER_MODE")
     razorpay_key_id: Optional[str] = Field(None, env="RAZORPAY_KEY_ID")
     razorpay_key_secret: Optional[str] = Field(None, env="RAZORPAY_KEY_SECRET")
-    razorpay_webhook_secret: Optional[str] = Field(None, env="RAZORPAY_WEBHOOK_SECRET")
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",          # ← prevents crash from unknown keys
-        case_sensitive=False
+    razorpay_webhook_secret: Optional[str] = Field(
+        None, env="RAZORPAY_WEBHOOK_SECRET"
     )
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = False
 
 
 settings = Settings()

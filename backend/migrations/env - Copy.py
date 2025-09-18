@@ -1,3 +1,5 @@
+# backend/migrations/env.py
+
 import os
 import sys
 from pathlib import Path
@@ -7,29 +9,27 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool, inspect
 
-import pkgutil
-import importlib
-
 # ------------------------------------------------------------------------------
 # 1) Project Setup: add root to path + load .env
 # ------------------------------------------------------------------------------
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-ENV_PATH = BACKEND_DIR / ".env"
-sys.path.insert(0, str(BACKEND_DIR))  # Ensure 'app' is importable
-load_dotenv(dotenv_path=ENV_PATH)
-print(">>> Loaded .env from:", ENV_PATH)
-print(">>> sys.path includes:", sys.path[:3])
+BASE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BASE_DIR))
+load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # ------------------------------------------------------------------------------
-# 2) Import your Base and all model classes dynamically
+# 2) Import your Base and all model classes
 # ------------------------------------------------------------------------------
 from app.db.base import Base    # noqa
-
-# Dynamically import every module under app.models so that
-# all model classes are registered on Base.metadata
-package = importlib.import_module("app.models")
-for finder, module_name, ispkg in pkgutil.walk_packages(package.__path__, package.__name__ + "."):
-    importlib.import_module(module_name)
+from app.models.user import User
+from app.models.student import Student
+from app.models.class_section import ClassSection
+from app.models.fee.fee_plan import FeePlan
+from app.models.fee.fee_component import FeeComponent
+from app.models.fee.fee_plan_component import FeePlanComponent
+from app.models.fee.fee_assignment import FeeAssignment
+from app.models.fee.fee_invoice import FeeInvoice
+from app.models.fee.payment import Payment
+from app.models.fee.receipt import Receipt
 
 # ------------------------------------------------------------------------------
 # 3) Alembic Config + safe logging setup
@@ -74,7 +74,6 @@ def run_migrations_offline():
 # 6) Online Migrations with stamp detection and debug
 # ------------------------------------------------------------------------------
 def run_migrations_online():
-    print(">>> Connecting to DB URL:", get_url())
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -83,20 +82,20 @@ def run_migrations_online():
     )
 
     with connectable.connect() as connection:
-        connection = connection.execution_options(isolation_level="AUTOCOMMIT")
+        # detect if this invocation is 'stamp'
+        # is_stamp = getattr(config.cmd_opts, "cmd", None) == "stamp"
         raw_cmd = getattr(config.cmd_opts, "cmd", None)
         if isinstance(raw_cmd, tuple) and raw_cmd:
             invoked = raw_cmd[0].__name__
         else:
             invoked = None
-        print(">>> Alembic command invoked:", invoked)
         is_stamp = invoked == "stamp"
-
+        # is_stamp = "stamp" in context.get_x_argument(as_dictionary=True)
         if is_stamp:
-            # stamp should only record the revision, no schema diffs
+            # stamp should only write the version, no metadata comparison
             context.configure(connection=connection)
         else:
-            # Inspect live DB schema vs. models
+            # Inspect live DB schema
             inspector = inspect(connection)
             db_tables = inspector.get_table_names()
             model_tables = list(target_metadata.tables.keys())
@@ -112,13 +111,14 @@ def run_migrations_online():
             )
 
         with context.begin_transaction():
-            print(">>> Starting migration transaction")
             context.run_migrations()
-            print(">>> Finished migration transaction")
 
 # ------------------------------------------------------------------------------
 # 7) Branch on mode
 # ------------------------------------------------------------------------------
+# debug: show which cmd_opts keys are available
+
+
 if context.is_offline_mode():
     run_migrations_offline()
 else:

@@ -4,6 +4,9 @@ from app.schemas.fee.plan import FeePlanCreate, FeePlanOut
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.repositories.fee_repo import create_fee_plan, get_fee_plan
+from typing import List
+from app.repositories.fee_repo import list_fee_plans
+
 
 router = APIRouter(prefix="/api/v1/fee-plans", tags=["fees"])
 
@@ -18,3 +21,8 @@ def get_plan(plan_id: int, db: Session = Depends(get_db)):
     if not plan:
         raise HTTPException(status_code=404, detail={"code":"not_found","message":"Fee plan not found"})
     return plan
+
+@router.get("/", response_model=List[FeePlanOut])
+def list_plans(db: Session = Depends(get_db)):
+    return list_fee_plans(db)
+

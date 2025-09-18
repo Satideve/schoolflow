@@ -1,7 +1,6 @@
 # backend/app/db/session.py
-"""
-Database session management.
-"""
+
+from .base import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from app.core.config import settings

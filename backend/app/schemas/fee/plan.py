@@ -16,7 +16,7 @@ class FeePlanOut(BaseModel):
     frequency: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class FeeComponentCreate(BaseModel):
     name: str

@@ -1,0 +1,25 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Receipt {{ payment.receipt_no }}</title>
+  <style>
+    body { font-family: sans-serif; margin: 1in; }
+    h1 { text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 0.5em; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>Receipt {{ payment.receipt_no }}</h1>
+  <p><strong>Invoice ID:</strong> {{ invoice.id }}</p>
+  <p><strong>Student:</strong> {{ student.name }}</p>
+  <p><strong>Period:</strong> {{ invoice.period }}</p>
+  <table>
+    <tr><th>Description</th><th>Amount</th></tr>
+    <tr><td>Fees Due</td><td>{{ invoice.amount }}</td></tr>
+    <tr><td>Paid</td><td>{{ payment.amount }}</td></tr>
+  </table>
+  <p><strong>Date:</strong> {{ invoice.period }} due date</p>
+</body>
+</html>
