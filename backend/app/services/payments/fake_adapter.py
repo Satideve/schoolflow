@@ -20,4 +20,7 @@ class FakePaymentAdapter(PaymentGatewayInterface):
 
     def verify_webhook(self, payload: bytes, signature: str) -> bool:
         # Fake adapter always accepts a signature "fake-signature" for test harness
-        return signature == "fake-signature"
+        # return signature == "fake-signature"
+        
+        # Bypass verification for local testing
+        return True

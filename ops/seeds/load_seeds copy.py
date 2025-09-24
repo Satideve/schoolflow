@@ -41,7 +41,7 @@ Loads seed CSV files into DB for quick demo.
 import csv
 from pathlib import Path
 from typing import Dict, List
-from sqlalchemy import text, select, Table, MetaData, update
+from sqlalchemy import text, select, Table, MetaData
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -208,35 +208,20 @@ def run():
     db = SessionLocal()
     try:
         from app.models.user import User
+        stmt = select(User).where(User.email == "admin@school.local")
+        existing = db.execute(stmt).scalar_one_or_none()
 
-        OLD_EMAIL = "admin@school.local"
-        NEW_EMAIL = "admin@example.com"
-        DEFAULT_PASSWORD = "ChangeMe123!"
-
-        # migrate old admin email if present
-        migrated = db.execute(select(User).where(User.email == OLD_EMAIL)).scalar_one_or_none()
-        if migrated:
-            db.execute(
-                update(User)
-                .where(User.id == migrated.id)
-                .values(email=NEW_EMAIL)
-            )
-            db.commit()
-            print(f"Seed migrate: updated admin email {OLD_EMAIL} -> {NEW_EMAIL}")
-
-        # ensure admin exists with valid email
-        existing = db.execute(select(User).where(User.email == NEW_EMAIL)).scalar_one_or_none()
         if not existing:
             user = User(
-                email=NEW_EMAIL,
-                hashed_password=get_password_hash(DEFAULT_PASSWORD),
+                email="admin@school.local",
+                hashed_password=get_password_hash("ChangeMe123!"),
                 role="admin",
             )
             db.add(user)
             db.commit()
-            print(f"Seed done: admin user created ({NEW_EMAIL}).")
+            print("Seed done: admin user created.")
         else:
-            print(f"Seed skipped: admin already exists ({NEW_EMAIL}).")
+            print("Seed skipped: admin already exists.")
 
         with engine.connect() as conn:
             class_sections_csv = base / "class_sections.csv"
@@ -247,7 +232,9 @@ def run():
                     load_csv_to_table(class_sections_csv, "class_sections")
                     conn.commit()
                     _print_count(conn, "class_sections")
-                else:                  
+
+
+                # else:
                     print("Seed skipped: class_sections already populated.")
             else:
                 print("Seed note: class_sections.csv not found; skipping.")
@@ -267,6 +254,7 @@ def run():
 
         fees_csv = base / "seed_fees.csv"
         if fees_csv.exists():
+
             fp_rows = _print_count(engine.connect(), "fee_plan")
             fc_rows = _print_count(engine.connect(), "fee_component")
             if fc_rows == 0:
@@ -276,6 +264,7 @@ def run():
                 _print_count(engine.connect(), "fee_plan_component")
             else:
                 print("Seed skipped: fee components already populated.")
+
         else:
             print("Seed note: seed_fees.csv not found; skipping.")
 
@@ -284,4 +273,3 @@ def run():
 
 if __name__ == "__main__":
     run()
- 

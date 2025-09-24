@@ -88,7 +88,6 @@ def _find_wkhtmltopdf(preferred: Optional[str] = None) -> str:
     logger.error(msg)
     raise FileNotFoundError(msg)
 
-
 def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] = None) -> str:
     """
     Render receipt HTML from template and convert to PDF.
@@ -104,10 +103,8 @@ def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] 
     # 1) Render HTML via Jinja2
     tpl = env.get_template("receipts/receipt.html")
     html = tpl.render(**context)
-    # html = "<html><body><h1>PDF Test</h1><p>This is a minimal test.</p></body></html>"
 
-
-    # 2) Determine wkhtmltopdf binary path (checks env, settings, common locations)
+    # 2) Determine wkhtmltopdf binary path
     try:
         wkhtml_path = _find_wkhtmltopdf(settings.wkhtmltopdf_cmd)
     except FileNotFoundError as e:
@@ -116,7 +113,7 @@ def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] 
     # 3) Create pdfkit configuration
     config = pdfkit.configuration(wkhtmltopdf=wkhtml_path)
 
-    # 4) Merge default options with caller-provided ones
+    # 4) Merge default options
     default_options = {
         "enable-local-file-access": None,
         "print-media-type": None,
@@ -126,15 +123,10 @@ def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] 
         merged_options.update(options)
 
     # 5) Ensure output directory exists
-    # Use /tmp for safe, writable output
-    safe_dir = Path("/tmp/receipts")
-    safe_dir.mkdir(parents=True, exist_ok=True)
-    receipt_no = context.get("payment", {}).get("receipt_no", "unknown")
-    out_path = safe_dir / f"{receipt_no}.pdf"
+    out_path = Path(output_path) if output_path else Path("/tmp/receipts/unknown.pdf")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
-
-
-    # 6) Generate the PDF file from HTML
+    # 6) Generate the PDF
     try:
         pdfkit.from_string(html, str(out_path), configuration=config, options=merged_options)
     except OSError as exc:
@@ -146,3 +138,4 @@ def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] 
 
     logger.debug("PDF written to %s using wkhtmltopdf=%s", out_path, wkhtml_path)
     return str(out_path)
+

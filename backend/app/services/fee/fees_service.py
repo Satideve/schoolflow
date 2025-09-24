@@ -21,9 +21,12 @@ from app.services.payments.interface import PaymentGatewayInterface
 from app.services.pdf.renderer import render_receipt_pdf
 from app.services.messaging.interface import MessagingInterface
 from app.models.fee.fee_invoice import FeeInvoice
+from app.services.pdf.context_loader import load_receipt_context  # NEW
 
-RECEIPTS_DIR = Path("data/receipts")
+# CHANGE: align with existing receipt path conventions used elsewhere
+RECEIPTS_DIR = Path("app/data/receipts")
 RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 class FeesService:
     def __init__(
@@ -56,10 +59,8 @@ class FeesService:
         )
         return order
 
-    
     # def handle_webhook_mark_paid(self, webhook_payload: bytes, signature: str) -> dict:
     def handle_webhook_mark_paid(self, webhook_payload: bytes, signature: str, pdf_options: dict | None = None) -> dict:
-
         """Verify webhook and create Payment + Receipt + mark invoice paid."""
         # 1) signature check
         if not self.gateway.verify_webhook(webhook_payload, signature):
@@ -111,32 +112,20 @@ class FeesService:
         # 7) mark invoice paid
         mark_invoice_paid(self.db, invoice)
 
-        # 8) generate receipt PDF
+        # 8) create receipt record with final path (persist first)
         receipt_no = f"REC-{uuid.uuid4().hex[:10].upper()}"
         pdf_path = str(RECEIPTS_DIR / f"{receipt_no}.pdf")
 
-        ctx = {
-            "invoice": {
-                "id": invoice.id,
-                "amount": float(invoice.amount_due),
-                "period": invoice.period,
-            },
-            "student": {"name": f"Student #{invoice.student_id}"},
-            "payment": {
-                "provider_txn_id": provider_txn_id,
-                "amount": float(amount),
-                "receipt_no": receipt_no,
-            },
-        }
-        render_receipt_pdf(ctx, pdf_path)
-
-        # 9) persist receipt record
         receipt = create_receipt(
             self.db,
             payment_id=payment.id,
             receipt_no=receipt_no,
             pdf_path=pdf_path,
         )
+
+        # 9) load context from DB using the now-persisted receipt id, then render PDF
+        context = load_receipt_context(receipt.id, self.db)
+        render_receipt_pdf(context, pdf_path)
 
         # 10) send notification
         self.messaging.send_email(

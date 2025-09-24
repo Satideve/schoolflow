@@ -1,7 +1,8 @@
+# schoolflow/backend/app/api/v1/routers/fees/payments.py
 from fastapi import APIRouter, Request, Header, Depends, HTTPException
 from app.services.payments.fake_adapter import FakePaymentAdapter
 from app.services.messaging.fake_adapter import FakeMessagingAdapter
-from app.services.fees_service import FeesService
+from app.services.fee.fees_service import FeesService
 from app.db.session import get_db
 from sqlalchemy.orm import Session
 

@@ -16,3 +16,17 @@ class Student(Base):
         "ClassSection",
         back_populates="students"
     )
+
+    # Back-populates FeeAssignment.student
+    fee_assignments = relationship(
+        "FeeAssignment",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )
+
+    # NEW: Back-populates FeeInvoice.student (which likely uses back_populates="invoices")
+    invoices = relationship(
+        "FeeInvoice",
+        back_populates="student",
+        cascade="all, delete-orphan"
+    )

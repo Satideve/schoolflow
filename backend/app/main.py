@@ -5,27 +5,34 @@ FastAPI app factory for SchoolFlow.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging import setup_logging
-
-from app.api.v1.routers import auth, health, class_sections, students
-from app.api.v1.routers.fees import plans, invoices, payments
-from app.api.v1.routers import pdf  # ✅ Added PDF route
 from app.db import session as dbsession
+
+# Import the central API router aggregator
+from app.api.v1.api import api_router
+
 
 def create_app():
     setup_logging()
     app = FastAPI(title=settings.app_name, version="0.1.0")
 
-    # Include routers
-    app.include_router(auth.router)
-    app.include_router(health.router)
-    app.include_router(plans.router)
-    app.include_router(invoices.router)
-    app.include_router(payments.router)
-    app.include_router(class_sections.router)
-    app.include_router(students.router)
-    app.include_router(pdf.router)  # ✅ Register PDF route
+    # CORS: allow local dev tools to call the API (e.g., swagger UI, frontend)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Include all versioned API routers
+    app.include_router(api_router)
 
     # attach DB engine/session for graceful shutdown if needed
     @app.on_event("startup")
@@ -38,5 +45,6 @@ def create_app():
         dbsession.SessionLocal.remove()
 
     return app
+
 
 app = create_app()
