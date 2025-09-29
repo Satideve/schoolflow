@@ -12,6 +12,7 @@ class ReceiptOut(ReceiptCreate):
     id: int
     pdf_path: str
     created_at: datetime
+    created_by: int   # NEW FIELD for audit trail
 
     class Config:
         from_attributes = True
