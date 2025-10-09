@@ -1,5 +1,4 @@
 # backend/app/schemas/fee/receipt.py
-
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
@@ -12,7 +11,7 @@ class ReceiptOut(ReceiptCreate):
     id: int
     pdf_path: str
     created_at: datetime
-    created_by: int   # NEW FIELD for audit trail
+    created_by: Optional[int]   # allow null/None for older receipts or system-generated ones
 
     class Config:
         from_attributes = True

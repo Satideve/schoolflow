@@ -1,5 +1,4 @@
 # infra/Dockerfile.backend
-
 # Stage 1: Get patched wkhtmltopdf from Alpine image
 FROM surnet/alpine-wkhtmltopdf:3.12.4-0.12.6-full AS wkhtmltopdf
 
@@ -19,7 +18,6 @@ COPY --from=wkhtmltopdf /lib/libcrypto.so.1.1 /lib/libcrypto.so.1.1
 # Point pdfkit to the correct binary path
 ENV WKHTMLTOPDF_CMD=/bin/wkhtmltopdf
 
-
 # 2. Install system dependencies
 RUN apk add --no-cache \
       fontconfig \
@@ -34,17 +32,17 @@ RUN apk add --no-cache \
       build-base \
       libffi-dev \
       openssl-dev \
+      python3-dev \
       py3-pip \
       py3-setuptools \
       py3-wheel \
+      py3-bcrypt \
  && pip install --upgrade pip
 
-# 3. Install Poetry using pipx to isolate it from project dependencies
-RUN pip install pipx \
- && pipx install poetry \
- && ln -s /root/.local/bin/poetry /usr/local/bin/poetry
+# 3. Install Poetry (direct pip install is simpler & deterministic in Docker)
+RUN pip install --no-cache-dir poetry
 
-# 4. Tell pdfkit where wkhtmltopdf lives
+# 4. Tell pdfkit where wkhtmltopdf lives (use /bin path copied above at runtime)
 ENV WKHTMLTOPDF_CMD=/usr/bin/wkhtmltopdf
 
 # 5. Set working directory inside the container
@@ -53,7 +51,12 @@ WORKDIR /app/backend
 # 6. Copy lockfiles and install Python dependencies (including dev)
 COPY ../backend/pyproject.toml ../backend/poetry.lock ./
 RUN poetry config virtualenvs.create false \
- && poetry install --no-root
+ && poetry install --no-root \
+ && pip install python-multipart
+
+# NOTE: we intentionally do NOT attempt to compile bcrypt from source here.
+# Instead we rely on the Alpine-provided py3-bcrypt package installed above,
+# which supplies a working bcrypt extension built for musl.
 
 # 7. Copy the rest of the backend source code
 COPY ../backend ./

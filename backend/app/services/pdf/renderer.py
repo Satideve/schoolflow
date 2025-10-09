@@ -139,3 +139,5 @@ def render_receipt_pdf(context: Dict, output_path: str, options: Optional[Dict] 
     logger.debug("PDF written to %s using wkhtmltopdf=%s", out_path, wkhtml_path)
     return str(out_path)
 
+# We haven’t duplicated logic—just reuse the receipt generator for invoices.
+render_invoice_pdf = render_receipt_pdf

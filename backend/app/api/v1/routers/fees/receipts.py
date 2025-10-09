@@ -1,5 +1,4 @@
 # backend/app/api/v1/routers/fees/receipts.py
-
 import os
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Security, status
@@ -108,6 +107,38 @@ def create_receipt(
     return receipt
 
 
+@router.get("/", response_model=list[ReceiptOut], status_code=status.HTTP_200_OK)
+def list_receipts(
+    db: Session = Depends(get_db),
+    current_user=Security(get_current_user),
+):
+    """
+    Return metadata for all receipts (primary list endpoint).
+    Kept consistent with /metadata endpoint:
+    - Admin/Clerk: see all
+    - Student/Parent: see only their own receipts
+    """
+    role = getattr(current_user, "role", None)
+    query = db.query(Receipt).order_by(Receipt.created_at.desc())
+
+    if role in {"admin", "clerk"}:
+        receipts = query.all()
+    elif role in {"student", "parent"}:
+        receipts = (
+            query.join(Payment, Receipt.payment_id == Payment.id)
+            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .filter(Invoice.student_id == getattr(current_user, "student_id", None))
+            .all()
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "Not authorized"},
+        )
+
+    return [ReceiptOut.from_orm(r) for r in receipts]
+
+
 @router.get("/metadata", response_model=list[ReceiptOut], status_code=status.HTTP_200_OK)
 def list_receipts_metadata(
     db: Session = Depends(get_db),
@@ -187,42 +218,6 @@ def get_receipt(
     return ReceiptOut.from_orm(receipt)
 
 
-def _backend_root() -> str:
-    """
-    Resolve the backend directory (…/backend) robustly from this file path.
-    """
-    p = Path(__file__).resolve()
-    # Path: backend/app/api/v1/routers/fees/receipts.py
-    # parents: [fees, routers, v1, api, app, backend, <repo root>]
-    backend_dir = p.parents[4]  # index 4 -> backend
-    return str(backend_dir)
-
-
-def _resolve_pdf_path(pdf_path: str) -> str:
-    """
-    Normalize stored receipt pdf_path (e.g., 'app/data/receipts/RCT-...pdf')
-    to an absolute path inside the container. Join with backend root.
-    Keep the leading 'app/' because PDFs are under backend/app/data/receipts.
-    """
-    base_dir = getattr(settings, "base_dir", None) or _backend_root()
-    rel = pdf_path.replace("\\", "/")
-    rel = rel.lstrip("/")  # avoid accidental absolute join issues
-
-    # First attempt: backend + pdf_path (keeps 'app/')
-    candidate = os.path.join(base_dir, rel)
-    if os.path.isfile(candidate):
-        return candidate
-
-    # Second attempt: if base_dir already includes 'app', try without 'app/'
-    if rel.startswith("app/"):
-        alt = os.path.join(base_dir, rel[4:])
-        if os.path.isfile(alt):
-            return alt
-
-    # Return the first candidate (for error reporting)
-    return candidate
-
-
 @router.get("/{receipt_id}/download", response_class=FileResponse)
 def download_receipt_pdf(
     receipt_id: int,
@@ -241,8 +236,26 @@ def download_receipt_pdf(
 
     _enforce_role_or_ownership(db, current_user, receipt)
 
-    file_path = _resolve_pdf_path(receipt.pdf_path)
-    if not os.path.isfile(file_path):
+    # Use centralized path resolution for deterministic behavior across envs
+    file_path = settings.resolve_path(receipt.pdf_path)
+
+    # Extra safety: ensure file is within receipts_dir to avoid path traversal
+    receipts_root = settings.receipts_path()
+    try:
+        fp = Path(file_path).resolve()
+        if receipts_root not in fp.parents and fp != receipts_root:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "forbidden", "message": "Access outside receipts directory is forbidden"},
+            )
+    except Exception:
+        # Path resolution failure
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": f"Invalid receipt path: {file_path}"},
+        )
+
+    if not Path(file_path).is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": f"PDF file missing on server: {file_path}"},

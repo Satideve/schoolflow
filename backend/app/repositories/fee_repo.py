@@ -2,11 +2,16 @@
 
 """
 Repository methods for fee module.
+
+Contains helper functions for fee-plans, components, assignments, payments,
+and receipts. These are used across services and tests.
 """
 
 from sqlalchemy.orm import Session
 from decimal import Decimal
 from datetime import datetime
+from typing import Optional
+import uuid
 
 from app.models.fee.fee_plan import FeePlan
 from app.models.fee.fee_component import FeeComponent
@@ -15,6 +20,7 @@ from app.models.fee.fee_assignment import FeeAssignment
 from app.models.fee.fee_invoice import FeeInvoice
 from app.models.fee.payment import Payment
 from app.models.fee.receipt import Receipt
+
 
 def create_fee_plan(
     db: Session, name: str, academic_year: str, frequency: str
@@ -25,11 +31,14 @@ def create_fee_plan(
     db.refresh(plan)
     return plan
 
+
 def get_fee_plan(db: Session, plan_id: int) -> FeePlan | None:
     return db.query(FeePlan).filter(FeePlan.id == plan_id).first()
 
+
 def list_fee_plans(db: Session) -> list[FeePlan]:
     return db.query(FeePlan).all()
+
 
 def create_fee_component(
     db: Session, name: str, description: str | None = None
@@ -39,6 +48,7 @@ def create_fee_component(
     db.commit()
     db.refresh(comp)
     return comp
+
 
 def add_component_to_plan(
     db: Session, fee_plan_id: int, fee_component_id: int, amount: Decimal
@@ -52,6 +62,7 @@ def add_component_to_plan(
     db.commit()
     db.refresh(item)
     return item
+
 
 def create_fee_assignment(
     db: Session, student_id: int, fee_plan_id: int, concession: Decimal | None = None, note: str | None = None
@@ -67,11 +78,27 @@ def create_fee_assignment(
     db.refresh(assignment)
     return assignment
 
+
 def create_invoice(
-    db: Session, student_id: int, period: str, amount_due: Decimal, due_date: datetime
+    db: Session,
+    student_id: int,
+    period: str,
+    amount_due: Decimal,
+    due_date: datetime,
+    invoice_no: Optional[str] = None,
 ) -> FeeInvoice:
+    """
+    Create a FeeInvoice. `invoice_no` is optional for backward compatibility:
+    - If caller supplies invoice_no, that value is used.
+    - If not supplied, a unique invoice_no will be generated (INV-XXXXXXXX).
+    This prevents NOT NULL constraint failures for code paths that didn't set invoice_no.
+    """
+    if not invoice_no:
+        invoice_no = f"INV-{uuid.uuid4().hex[:8].upper()}"
+
     inv = FeeInvoice(
         student_id=student_id,
+        invoice_no=invoice_no,
         period=period,
         amount_due=amount_due,
         due_date=due_date
@@ -80,6 +107,7 @@ def create_invoice(
     db.commit()
     db.refresh(inv)
     return inv
+
 
 def create_payment(
     db: Session,
@@ -103,6 +131,7 @@ def create_payment(
     db.refresh(payment)
     return payment
 
+
 def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
     invoice.status = "paid"
     db.add(invoice)
@@ -110,13 +139,17 @@ def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
     db.refresh(invoice)
     return invoice
 
+
 def create_receipt(
-    db: Session, payment_id: int, receipt_no: str, pdf_path: str
+    db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
 ) -> Receipt:
+    # created_by kept optional to maintain compatibility with older code paths;
+    # higher-level services (ReceiptService) will set created_by when appropriate.
     receipt = Receipt(
         payment_id=payment_id,
         receipt_no=receipt_no,
-        pdf_path=pdf_path
+        pdf_path=pdf_path,
+        created_by=created_by,
     )
     db.add(receipt)
     db.commit()
