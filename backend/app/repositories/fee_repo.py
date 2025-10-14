@@ -140,18 +140,41 @@ def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
     return invoice
 
 
+# def create_receipt(
+#     db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
+# ) -> Receipt:
+#     # created_by kept optional to maintain compatibility with older code paths;
+#     # higher-level services (ReceiptService) will set created_by when appropriate.
+#     receipt = Receipt(
+#         payment_id=payment_id,
+#         receipt_no=receipt_no,
+#         pdf_path=pdf_path,
+#         created_by=created_by,
+#     )
+#     db.add(receipt)
+#     db.commit()
+#     db.refresh(receipt)
+#     return receipt
 def create_receipt(
     db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
 ) -> Receipt:
-    # created_by kept optional to maintain compatibility with older code paths;
-    # higher-level services (ReceiptService) will set created_by when appropriate.
+    """
+    Create and persist a Receipt.
+
+    - `created_by` is optional for backward compatibility.
+    - If not provided, fall back to a safe system/admin id (1) so NOT NULL DB constraints are satisfied.
+      (Higher-level code should pass a real user id when available.)
+    """
+    created_by_val = created_by if created_by is not None else 1
+
     receipt = Receipt(
         payment_id=payment_id,
         receipt_no=receipt_no,
         pdf_path=pdf_path,
-        created_by=created_by,
+        created_by=created_by_val,
     )
     db.add(receipt)
     db.commit()
     db.refresh(receipt)
     return receipt
+

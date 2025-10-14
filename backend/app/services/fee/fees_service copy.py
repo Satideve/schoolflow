@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 import uuid
 import json
-import logging
 
 from sqlalchemy.orm import Session
 
@@ -19,8 +18,6 @@ from app.services.pdf.context_loader import load_receipt_context, load_invoice_c
 from app.services.messaging.interface import MessagingInterface
 from app.models.fee.fee_invoice import FeeInvoice
 from app.core.config import settings
-
-logger = logging.getLogger(__name__)
 
 
 def _ensure_dir(path: Path) -> Path:
@@ -74,12 +71,7 @@ class FeesService:
             pdf_path = invoices_dir / filename
             if not pdf_path.exists():
                 ctx = load_invoice_context(existing.id, self.db)
-                render_invoice_pdf(ctx, str(pdf_path))
-                logger.info(
-                    "Rendered missing invoice PDF to %s for existing invoice %s",
-                    str(pdf_path),
-                    invoice_no,
-                )
+                render_invoice_pdf(ctx, pdf_path)
             return existing
 
         # Create invoice and commit
@@ -126,16 +118,11 @@ class FeesService:
         filename = f"INV-{invoice_no}.pdf"
         pdf_path = invoices_dir / filename
         ctx = load_invoice_context(inv.id, self.db)
-
-        rendered = render_invoice_pdf(ctx, str(pdf_path))
-        logger.info(
-            "Rendered invoice PDF to %s for invoice %s (id=%s)",
-            str(rendered),
-            invoice_no,
-            inv.id,
-        )
+        render_invoice_pdf(ctx, pdf_path)
 
         return inv
+
+    # ... rest of the class unchanged ...
 
     def create_payment_order(self, invoice_id: int, amount: Decimal):
         """Create a payment order via the payment gateway adapter."""
@@ -199,7 +186,6 @@ class FeesService:
         receipt_no = f"REC-{uuid.uuid4().hex[:10].upper()}"
         receipts_dir = get_receipts_dir()
         pdf_path = receipts_dir / f"{receipt_no}.pdf"
-
         receipt = create_receipt(
             self.db,
             payment_id=payment.id,
@@ -209,13 +195,7 @@ class FeesService:
 
         # 9) render receipt PDF
         ctx = load_receipt_context(receipt.id, self.db)
-        rendered_receipt = render_receipt_pdf(ctx, str(pdf_path))
-        logger.info(
-            "Rendered receipt PDF to %s for receipt %s (payment_id=%s)",
-            str(rendered_receipt),
-            receipt_no,
-            payment.id,
-        )
+        render_receipt_pdf(ctx, str(pdf_path))
 
         # 10) send notification
         self.messaging.send_email(

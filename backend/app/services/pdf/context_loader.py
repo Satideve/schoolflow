@@ -13,12 +13,6 @@ ValueError when the requested primary entity (receipt or invoice) is missing.
 They try to populate common fields that the templates consume so invoice
 rendering (which reuses the receipt renderer) does not fail when a given
 field is absent.
-
-This file replaces the previous implementation which accidentally raised
-`Receipt <id> not found` during invoice rendering. The new implementation
-ensures `load_invoice_context` looks up invoices (not receipts) and also
-provides any related `payment` objects so invoice templates that expect
-a `payment` variable won't error.
 """
 
 from __future__ import annotations
@@ -39,6 +33,14 @@ try:
     from app.models.fee.fee_assignment import FeeAssignment  # may or may not be used
 except Exception:
     FeeAssignment = None  # type: ignore
+
+# Optional fee-plan component models (used as fallback line-items)
+try:
+    from app.models.fee.fee_plan_component import FeePlanComponent
+    from app.models.fee.fee_component import FeeComponent
+except Exception:
+    FeePlanComponent = None  # type: ignore
+    FeeComponent = None  # type: ignore
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -62,6 +64,18 @@ def _student_display_name(student: Optional[Student]) -> Optional[str]:
     return getattr(student, "email", None) or (str(student.id) if getattr(student, "id", None) else None)
 
 
+def _safe_float(v):
+    try:
+        if v is None:
+            return None
+        return float(v)
+    except Exception:
+        try:
+            return float(str(v))
+        except Exception:
+            return None
+
+
 def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
     """
     Load template context for a receipt PDF.
@@ -80,11 +94,11 @@ def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
     except Exception:
         payment = None
 
-    # Invoice (optional, derived from payment.invoice_id if present)
+    # Invoice (optional, derived from payment.fee_invoice_id if present)
     invoice = None
-    if payment and getattr(payment, "invoice_id", None) is not None:
+    if payment and getattr(payment, "fee_invoice_id", None) is not None:
         try:
-            invoice = db.query(FeeInvoice).filter(FeeInvoice.id == payment.invoice_id).one_or_none()
+            invoice = db.query(FeeInvoice).filter(FeeInvoice.id == payment.fee_invoice_id).one_or_none()
         except Exception:
             invoice = None
 
@@ -97,37 +111,114 @@ def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
             student = None
 
     # Build a safe context with reasonable defaults
+    # amount: priority -> receipt.amount -> payment.amount -> invoice.amount_due
     amount = None
     if getattr(receipt, "amount", None) is not None:
-        try:
-            amount = float(receipt.amount)
-        except Exception:
-            amount = receipt.amount
+        amount = _safe_float(getattr(receipt, "amount"))
     elif payment and getattr(payment, "amount", None) is not None:
-        try:
-            amount = float(payment.amount)
-        except Exception:
-            amount = payment.amount
+        amount = _safe_float(getattr(payment, "amount"))
     elif invoice and getattr(invoice, "amount_due", None) is not None:
+        amount = _safe_float(getattr(invoice, "amount_due"))
+
+    # Attempt to build items from invoice -> fallback to assignment -> plan components
+    items: List[Dict[str, Any]] = []
+
+    # If invoice exists, try to gather items via invoice-related data (reuse load_invoice logic lightly)
+    try:
+        if invoice:
+            # look for FeeAssignment rows related to invoice or student which may act as line items
+            if FeeAssignment is not None:
+                possible_items = db.query(FeeAssignment).filter(getattr(FeeAssignment, "invoice_id", -1) == getattr(invoice, "id", -1)).all()
+                if not possible_items:
+                    # fallback: assignments linked by student & plan
+                    possible_items = db.query(FeeAssignment).filter(getattr(FeeAssignment, "student_id", -1) == getattr(invoice, "student_id", -1)).all()
+                for it in possible_items:
+                    items.append(
+                        {
+                            "id": getattr(it, "id", None),
+                            "description": getattr(it, "description", None) or getattr(it, "component_name", None) or None,
+                            "amount": _safe_float(getattr(it, "amount", None)),
+                        }
+                    )
+    except Exception:
+        items = []
+
+    # If still empty, attempt to derive from student's assigned fee plan components
+    if not items and FeeAssignment is not None and FeePlanComponent is not None:
         try:
-            amount = float(invoice.amount_due)
+            # try get assignment for student
+            assignment = None
+            if student:
+                assignment = db.query(FeeAssignment).filter(getattr(FeeAssignment, "student_id", -1) == getattr(student, "id", -1)).first()
+            if assignment and getattr(assignment, "fee_plan_id", None):
+                components = db.query(FeePlanComponent).filter(getattr(FeePlanComponent, "fee_plan_id") == getattr(assignment, "fee_plan_id")).all()
+                for comp in components:
+                    # try to get a human-friendly name from FeeComponent if available
+                    comp_name = None
+                    try:
+                        if FeeComponent is not None and getattr(comp, "fee_component_id", None) is not None:
+                            cobj = db.query(FeeComponent).filter(getattr(FeeComponent, "id") == getattr(comp, "fee_component_id")).one_or_none()
+                            if cobj:
+                                comp_name = getattr(cobj, "name", None)
+                    except Exception:
+                        comp_name = None
+                    items.append(
+                        {
+                            "id": getattr(comp, "id", None),
+                            "description": comp_name or getattr(comp, "description", None) or getattr(comp, "name", None),
+                            "amount": _safe_float(getattr(comp, "amount", None)),
+                        }
+                    )
         except Exception:
-            amount = invoice.amount_due
+            # ignore; items remain as found
+            pass
+
+    # payments: collect recent payments that relate to this receipt/invoice
+    payments: List[Payment] = []
+    try:
+        if payment:
+            # include the payment used by this receipt
+            payments = [payment]
+        elif invoice:
+            payments = db.query(Payment).filter(Payment.fee_invoice_id == invoice.id).order_by(getattr(Payment, "created_at", None).desc() if getattr(Payment, "created_at", None) is not None else Payment.id.desc()).all()
+    except Exception:
+        payments = []
+
+    # compute paid_amount (sum of payments)
+    paid_amount = None
+    try:
+        if payments:
+            s = 0.0
+            for p in payments:
+                a = _safe_float(getattr(p, "amount", None))
+                if a is not None:
+                    s += a
+            paid_amount = s
+    except Exception:
+        paid_amount = None
 
     ctx: Dict[str, Any] = {
+        # primary fields
         "receipt_id": getattr(receipt, "id", None),
         "receipt_no": getattr(receipt, "receipt_no", None),
         "amount": amount,
+        "paid_amount": paid_amount,
         "issued_date": _iso(getattr(receipt, "issued_date", getattr(receipt, "created_at", None))),
         "payment": payment,
         "invoice": invoice,
         "invoice_no": getattr(invoice, "invoice_no", None) if invoice else None,
         "student": student,
         "student_name": _student_display_name(student),
-        # items: receipts may not have line items; leave empty list if none
-        "items": [],
-        # raw objects kept for template authors who prefer object attributes
+        # items and raw objects
+        "items": items,
         "_raw": {"receipt": receipt, "payment": payment, "invoice": invoice, "student": student},
+        "payments": payments,
+        # aliases & convenience fields for templates
+        "total": amount,
+        "fees_due": amount,
+        # document metadata helpers
+        "document_type": "receipt",
+        "title": "Receipt",
     }
 
     return ctx
@@ -156,30 +247,50 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
     items: List[Dict[str, Any]] = []
     if FeeAssignment is not None:
         try:
-            # FeeAssignment may reference invoice_id or plan_id depending on schema.
-            # We'll attempt both safe queries without causing an exception.
+            # FeeAssignment may reference invoice_id or student_id depending on schema.
             possible_items = db.query(FeeAssignment).filter(getattr(FeeAssignment, "invoice_id", -1) == invoice_id).all()
             if not possible_items:
-                # fallback: assignments linked by plan_id or other logic (best-effort)
-                possible_items = db.query(FeeAssignment).filter(getattr(FeeAssignment, "plan_id", -1) == getattr(invoice, "plan_id", -1)).all()
+                possible_items = db.query(FeeAssignment).filter(getattr(FeeAssignment, "student_id", -1) == getattr(invoice, "student_id", -1)).all()
             for it in possible_items:
                 items.append(
                     {
                         "id": getattr(it, "id", None),
                         "description": getattr(it, "description", None) or getattr(it, "component_name", None),
-                        "amount": float(getattr(it, "amount", 0)) if getattr(it, "amount", None) is not None else None,
+                        "amount": _safe_float(getattr(it, "amount", None)),
                     }
                 )
         except Exception:
             items = []
 
-    # Ensure amount fields are available in a template-friendly way
-    amount_due = None
-    if getattr(invoice, "amount_due", None) is not None:
+    # If items empty, attempt to use fee_plan components (if the student has an assignment with fee_plan)
+    if not items and FeeAssignment is not None and FeePlanComponent is not None:
         try:
-            amount_due = float(invoice.amount_due)
+            assignment = None
+            if student:
+                assignment = db.query(FeeAssignment).filter(getattr(FeeAssignment, "student_id", -1) == getattr(student, "id", -1)).first()
+            if assignment and getattr(assignment, "fee_plan_id", None):
+                components = db.query(FeePlanComponent).filter(getattr(FeePlanComponent, "fee_plan_id") == getattr(assignment, "fee_plan_id")).all()
+                for comp in components:
+                    comp_name = None
+                    try:
+                        if FeeComponent is not None and getattr(comp, "fee_component_id", None) is not None:
+                            cobj = db.query(FeeComponent).filter(getattr(FeeComponent, "id") == getattr(comp, "fee_component_id")).one_or_none()
+                            if cobj:
+                                comp_name = getattr(cobj, "name", None)
+                    except Exception:
+                        comp_name = None
+                    items.append(
+                        {
+                            "id": getattr(comp, "id", None),
+                            "description": comp_name or getattr(comp, "description", None) or getattr(comp, "name", None),
+                            "amount": _safe_float(getattr(comp, "amount", None)),
+                        }
+                    )
         except Exception:
-            amount_due = invoice.amount_due
+            pass
+
+    # Ensure amount fields are available in a template-friendly way
+    amount_due = _safe_float(getattr(invoice, "amount_due", None))
 
     # Payments: include recent payments linked to this invoice so invoice templates
     # that expect `payment` or `payments` won't fail. We prefer the most recent payment.
@@ -198,24 +309,44 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
         payments = []
         payment = None
 
+    # Sum paid amount
+    paid_amount = None
+    try:
+        if payments:
+            s = 0.0
+            for p in payments:
+                a = _safe_float(getattr(p, "amount", None))
+                if a is not None:
+                    s += a
+            paid_amount = s
+    except Exception:
+        paid_amount = None
+
     ctx: Dict[str, Any] = {
+        # primary invoice fields
         "invoice_id": getattr(invoice, "id", None),
         "invoice_no": getattr(invoice, "invoice_no", None),
-        "invoice": invoice,  # <-- ensure templates referencing `invoice` find it
+        "invoice": invoice,  # ensure templates referencing `invoice` find it
         "period": getattr(invoice, "period", None),
         "amount_due": amount_due,
         "due_date": _iso(getattr(invoice, "due_date", None)),
         "student": student,
         "student_name": _student_display_name(student),
         "items": items,
-        # Keep raw invoice object available for templates needing it
+        # raw objects and payments
         "_raw": {"invoice": invoice, "student": student, "payment": payment, "payments": payments},
-        # Also include some aliases that templates using receipt layout might expect:
-        "amount": amount_due,
-        "issued_date": _iso(getattr(invoice, "created_at", None) or getattr(invoice, "issued_date", None)),
-        # Include payment(s) so templates that reference `payment` won't raise
         "payment": payment,
         "payments": payments,
+        # aliases used by templates
+        "amount": amount_due,
+        "total": amount_due,
+        "fees_due": amount_due,
+        "paid_amount": paid_amount,
+        "issued_date": _iso(getattr(invoice, "created_at", None) or getattr(invoice, "issued_date", None)),
+        # document metadata helpers
+        "document_type": "invoice",
+        "title": "Invoice",
     }
 
     return ctx
+

@@ -1,0 +1,7 @@
+﻿{
+  "student_id": 1,
+  "invoice_no": "INV-SMOKE-001",
+  "period": "Oct-2025",
+  "amount_due": 1500.00,
+  "due_date": "2025-10-31"
+}

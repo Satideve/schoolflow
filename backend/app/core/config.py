@@ -1,5 +1,3 @@
-# backend/app/core/config.py
-
 """
 Configuration for SchoolFlow using Pydantic BaseSettings.
 """
@@ -117,11 +115,88 @@ class Settings(BaseSettings):
 
     def resolve_path(self, relative_path: str) -> str:
         """
-        Resolve a relative path (e.g., 'app/data/receipts/RCT-...pdf') from base_dir.
-        Keeps forward slashes and strips leading slash to avoid absolute joins.
+        Normalize a stored path string to an absolute path.
+
+        Accepts values that may be:
+        - absolute paths (e.g. '/app/backend/app/data/receipts/REC-...pdf')
+        - relative paths that start with 'app/' (legacy)
+        - other relative paths
+
+        Strategy:
+        - If `relative_path` is falsy -> return resolved base_dir.
+        - If `relative_path` is absolute -> return its normalized absolute path.
+        - Otherwise join with base_dir and prefer an existing candidate if found.
+        - Try a fallback removing a leading 'app/' segment.
+        - As a last attempt, look for any suffix of the provided path that exists under base_dir.
+        - Returns a (string) absolute path. Caller should still check file existence if needed.
         """
-        rel = relative_path.replace("\\", "/").lstrip("/")
-        return str((Path(self.base_dir) / rel).resolve())
+        # guard against None/empty
+        if not relative_path:
+            return str(Path(self.base_dir).resolve())
+
+        # Normalize separators and avoid accidental absolute join
+        rel = str(relative_path).replace("\\", "/")
+
+        p = Path(rel)
+        # If user stored an absolute path, prefer and normalize it.
+        if p.is_absolute():
+            try:
+                return str(p.resolve())
+            except Exception:
+                # fallback to no-resolve if something odd happens
+                return str(p)
+
+        # At this point path is relative; use base_dir as root
+        base = Path(self.base_dir).resolve()
+
+        # Candidate 1: base + rel (strip any leading '/')
+        candidate = (base / rel.lstrip("/"))
+        try:
+            cand_resolved = candidate.resolve()
+        except Exception:
+            # resolve(strict=False) available but keep safe fallback
+            try:
+                cand_resolved = candidate.resolve(strict=False)
+            except Exception:
+                cand_resolved = candidate
+
+        if cand_resolved.exists():
+            return str(cand_resolved)
+
+        # Candidate 2: if stored path starts with 'app/', try without that segment
+        if rel.startswith("app/"):
+            alt = (base / rel[4:].lstrip("/"))
+            try:
+                alt_resolved = alt.resolve()
+            except Exception:
+                try:
+                    alt_resolved = alt.resolve(strict=False)
+                except Exception:
+                    alt_resolved = alt
+            if alt_resolved.exists():
+                return str(alt_resolved)
+
+        # Candidate 3: try progressive suffixes of the provided relative path
+        # e.g., stored 'some/extra/app/data/invoices/INV-...' -> try to find suffix under base
+        parts = [p for p in rel.split("/") if p]
+        for i in range(len(parts)):
+            suffix = "/".join(parts[i:])
+            cand = (base / suffix)
+            try:
+                cand_res = cand.resolve()
+            except Exception:
+                try:
+                    cand_res = cand.resolve(strict=False)
+                except Exception:
+                    cand_res = cand
+            if cand_res.exists():
+                return str(cand_res)
+
+        # If we couldn't find an existing file, return the primary candidate (normalized)
+        try:
+            return str(candidate.resolve(strict=False))
+        except Exception:
+            return str(candidate)
 
     def receipts_path(self) -> Path:
         """
