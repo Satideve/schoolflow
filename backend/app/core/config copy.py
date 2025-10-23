@@ -1,5 +1,3 @@
-# backend/app/core/config.py
-
 """
 Configuration for SchoolFlow using Pydantic BaseSettings.
 """
@@ -25,11 +23,11 @@ class Settings(BaseSettings):
 
     # JWT / Security
     secret_key: str = Field(..., env="SECRET_KEY")
-    access_token_expire_minutes: int = Field(60, env="ACCESS_TOKEN_EXPIRE_MINUTES")  
-    refresh_token_expire_days: int = Field(7, env="REFRESH_TOKEN_EXPIRE_DAYS")       
+    access_token_expire_minutes: int = Field(60, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_days: int = Field(7, env="REFRESH_TOKEN_EXPIRE_DAYS")
 
     # wkhtmltopdf: path to the binary inside the container
-    wkhtmltopdf_cmd: str = Field("/usr/bin/wkhtmltopdf", env="WKHTMLTOPDF_CMD")      
+    wkhtmltopdf_cmd: str = Field("/usr/bin/wkhtmltopdf", env="WKHTMLTOPDF_CMD")
 
     # SMTP (MailHog default)
     smtp_host: str = Field("localhost", env="SMTP_HOST")
@@ -41,7 +39,7 @@ class Settings(BaseSettings):
     # Payment Providers
     provider_mode: str = Field("fake", env="PROVIDER_MODE")
     razorpay_key_id: Optional[str] = Field(None, env="RAZORPAY_KEY_ID")
-    razorpay_key_secret: Optional[str] = Field(None, env="RAZORPAY_KEY_SECRET")      
+    razorpay_key_secret: Optional[str] = Field(None, env="RAZORPAY_KEY_SECRET")
     razorpay_webhook_secret: Optional[str] = Field(
         None, env="RAZORPAY_WEBHOOK_SECRET"
     )
@@ -53,7 +51,7 @@ class Settings(BaseSettings):
     invoices_dir: str = Field("app/data/invoices", env="INVOICES_DIR")
 
     # CORS
-    cors_origins: List[str] = Field(default_factory=list, env="CORS_ORIGINS")        
+    cors_origins: List[str] = Field(default_factory=list, env="CORS_ORIGINS")
     cors_allow_credentials: bool = Field(True, env="CORS_ALLOW_CREDENTIALS")
     cors_allow_methods: List[str] = Field(
         default_factory=lambda: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -76,7 +74,7 @@ class Settings(BaseSettings):
     @field_validator("secret_key")
     def validate_secret_key(cls, v: str) -> str:
         if not v or len(v.strip()) < 16:
-            raise ValueError("SECRET_KEY must be set and at least 16 characters")    
+            raise ValueError("SECRET_KEY must be set and at least 16 characters")
         return v
 
     @field_validator("access_token_expire_minutes")
@@ -92,7 +90,7 @@ class Settings(BaseSettings):
         if not base.exists() or not base.is_dir():
             raise ValueError(f"BASE_DIR does not exist or is not a directory: {base}")
         if not (base / "app").exists():
-            raise ValueError(f"BASE_DIR missing expected 'app' directory: {base}")   
+            raise ValueError(f"BASE_DIR missing expected 'app' directory: {base}")
         return str(base)
 
     @field_validator("cors_origins", mode="before")
@@ -126,8 +124,8 @@ class Settings(BaseSettings):
 
         Strategy:
         - If `relative_path` is falsy -> return resolved base_dir.
-        - If `relative_path` is absolute -> return its normalized absolute path.     
-        - Otherwise join with base_dir and prefer an existing candidate if found.    
+        - If `relative_path` is absolute -> return its normalized absolute path.
+        - Otherwise join with base_dir and prefer an existing candidate if found.
         - Try a fallback removing a leading 'app/' segment.
         - As a last attempt, look for any suffix of the provided path that exists under base_dir.
         - Returns a (string) absolute path. Caller should still check file existence if needed.
@@ -165,7 +163,7 @@ class Settings(BaseSettings):
         if cand_resolved.exists():
             return str(cand_resolved)
 
-        # Candidate 2: if stored path starts with 'app/', try without that segment   
+        # Candidate 2: if stored path starts with 'app/', try without that segment
         if rel.startswith("app/"):
             alt = (base / rel[4:].lstrip("/"))
             try:
@@ -178,7 +176,7 @@ class Settings(BaseSettings):
             if alt_resolved.exists():
                 return str(alt_resolved)
 
-        # Candidate 3: try progressive suffixes of the provided relative path        
+        # Candidate 3: try progressive suffixes of the provided relative path
         # e.g., stored 'some/extra/app/data/invoices/INV-...' -> try to find suffix under base
         parts = [p for p in rel.split("/") if p]
         for i in range(len(parts)):
@@ -203,42 +201,14 @@ class Settings(BaseSettings):
     def receipts_path(self) -> Path:
         """
         Returns the absolute Path to the receipts directory.
-
-        Preference order:
-          1) If an external data root exists at parent(base_dir)/data, use that:
-               parent(base_dir)/data/<receipts-directory-name>
-             e.g. when base_dir=/app/backend -> /app/data/receipts
-          2) Fallback to the configured path under base_dir:
-               base_dir / receipts_dir (legacy behavior)
         """
-        base = Path(self.base_dir).resolve()
-        # external data root candidate (outside backend dir, useful for container volumes)
-        external_candidate = (base.parent / "data" / Path(self.receipts_dir).name)
-        try:
-            # If external candidate exists or can be created, prefer it
-            if external_candidate.exists():
-                return external_candidate.resolve()
-        except Exception:
-            pass
-        # Fallback: keep legacy behavior
-        return (base / self.receipts_dir).resolve()
+        return (Path(self.base_dir) / self.receipts_dir).resolve()
 
     def invoices_path(self) -> Path:
         """
         Returns the absolute Path to the invoices directory.
-
-        Preference order:
-          1) parent(base_dir)/data/invoices  (e.g. /app/data/invoices when base_dir=/app/backend)
-          2) base_dir / invoices_dir (legacy behavior)
         """
-        base = Path(self.base_dir).resolve()
-        external_candidate = (base.parent / "data" / Path(self.invoices_dir).name)
-        try:
-            if external_candidate.exists():
-                return external_candidate.resolve()
-        except Exception:
-            pass
-        return (base / self.invoices_dir).resolve()
+        return (Path(self.base_dir) / self.invoices_dir).resolve()
 
 
 def validate_startup(s: Settings) -> None:
@@ -246,26 +216,10 @@ def validate_startup(s: Settings) -> None:
     Validates critical runtime assumptions and prepares directories.
     Raises ValueError on misconfiguration to fail-fast at startup.
     """
-    # Primary (legacy) dirs under base_dir
     receipts_dir = s.receipts_path()
     invoices_dir = s.invoices_path()
-
-    # Ensure primary directories exist (this will create base_dir-based dirs if needed)
     receipts_dir.mkdir(parents=True, exist_ok=True)
     invoices_dir.mkdir(parents=True, exist_ok=True)
-
-    # Also attempt to ensure the external /app/data style directories exist
-    # Only attempt creation if parent(base_dir)/data is writable/exists
-    base = Path(s.base_dir).resolve()
-    external_data_root = base.parent / "data"
-    try:
-        external_data_root.mkdir(parents=True, exist_ok=True)
-        # Create external invoices/receipts subdirs
-        (external_data_root / Path(s.invoices_dir).name).mkdir(parents=True, exist_ok=True)
-        (external_data_root / Path(s.receipts_dir).name).mkdir(parents=True, exist_ok=True)
-    except Exception:
-        # Not fatal — leave it to runtime code to handle missing dirs if permissions prevent creation.
-        pass
 
     # Verify write/read health (temp file round-trip)
     for d in (receipts_dir, invoices_dir):

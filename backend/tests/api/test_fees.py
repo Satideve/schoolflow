@@ -19,12 +19,28 @@ def _make_invoice_payload(student_id: int = 1, amount: float | Decimal = 5000.0)
     }
 
 
-def test_create_fee(auth_client):
+def test_create_fee(auth_client, seed_student):
     """
     Ensure we can create a fee-like invoice via the API.
-    (Updated to call invoices endpoint which replaces the legacy /fees/.)
+    Uses seed_student fixture so we don't rely on a magic student id.
+
+    Note: some fixture variants may return a SQLAlchemy model instance or a plain dict.
+    Handle both gracefully.
     """
-    payload = _make_invoice_payload(student_id=1, amount=5000)
+    # tolerate either a model with .id or a dict-like object
+    try:
+        student_id = getattr(seed_student, "id")
+    except Exception:
+        # fallback for dicts or other mappings
+        if isinstance(seed_student, dict):
+            student_id = seed_student.get("id")
+        else:
+            # last-resort attempt
+            student_id = seed_student["id"] if hasattr(seed_student, "__getitem__") else None
+
+    assert student_id is not None, "seed_student did not provide an id"
+
+    payload = _make_invoice_payload(student_id=student_id, amount=5000)
     resp: Response = auth_client.post("/api/v1/invoices/", json=payload)
     assert resp.status_code == 201, resp.text
     data = resp.json()
@@ -77,7 +93,7 @@ def test_get_single_fee(auth_client):
 def test_create_fee_payment(auth_client):
     """
     Create an invoice, then call payments/create-order to ensure the payment-order endpoint works.
-    This replaces legacy fee-payment creation which no longer exists as /fee-payments/.
+    This replaces legacy fee-payment creation which no longer exists as /fee-payments/.     
     """
     payload = _make_invoice_payload(student_id=20, amount=3500.00)
     create_resp = auth_client.post("/api/v1/invoices/", json=payload)
@@ -86,12 +102,12 @@ def test_create_fee_payment(auth_client):
     invoice_id = invoice["id"]
 
     # Create order for the invoice (returns an 'order' object)
-    pay_resp: Response = auth_client.post(f"/api/v1/payments/create-order/{invoice_id}")
+    pay_resp: Response = auth_client.post(f"/api/v1/payments/create-order/{invoice_id}")    
     assert pay_resp.status_code == 200, pay_resp.text
     body = pay_resp.json()
     assert "order" in body, body
     order = body["order"]
-    # best-effort assertions (adapter shape may vary); ensure invoice amount is represented
+    # best-effort assertions (adapter shape may vary); ensure invoice amount is represented 
     assert order is not None
     # If the adapter returns amount or total fields, check them when present
     if isinstance(order, dict):

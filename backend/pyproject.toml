@@ -27,6 +27,7 @@ psycopg2-binary = "^2.9.10"
 pydantic-settings = "^2.10.1"
 bcrypt = "^4.3.0"
 pandas = "^2.2"
+fpdf = "^1.7.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.2"

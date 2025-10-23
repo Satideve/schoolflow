@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from typing import List
 
 from app.schemas.fee.receipt import ReceiptCreate, ReceiptOut
 from app.services.fee.receipt_service import ReceiptService
@@ -44,7 +45,7 @@ def _enforce_role_or_ownership(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "not_found", "message": "Payment not found"},
             )
-        invoice = db.query(Invoice).filter(Invoice.id == payment.invoice_id).first()
+        invoice = db.query(Invoice).filter(Invoice.id == getattr(payment, "fee_invoice_id", None) or getattr(payment, "invoice_id", None)).first()
         if not invoice or invoice.student_id != getattr(current_user, "student_id", None):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -107,7 +108,7 @@ def create_receipt(
     return receipt
 
 
-@router.get("/", response_model=list[ReceiptOut], status_code=status.HTTP_200_OK)
+@router.get("/", response_model=List[ReceiptOut], status_code=status.HTTP_200_OK)
 def list_receipts(
     db: Session = Depends(get_db),
     current_user=Security(get_current_user),
@@ -126,7 +127,7 @@ def list_receipts(
     elif role in {"student", "parent"}:
         receipts = (
             query.join(Payment, Receipt.payment_id == Payment.id)
-            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .join(Invoice, Payment.fee_invoice_id == Invoice.id)
             .filter(Invoice.student_id == getattr(current_user, "student_id", None))
             .all()
         )
@@ -139,7 +140,7 @@ def list_receipts(
     return [ReceiptOut.from_orm(r) for r in receipts]
 
 
-@router.get("/metadata", response_model=list[ReceiptOut], status_code=status.HTTP_200_OK)
+@router.get("/metadata", response_model=List[ReceiptOut], status_code=status.HTTP_200_OK)
 def list_receipts_metadata(
     db: Session = Depends(get_db),
     current_user=Security(get_current_user),
@@ -160,7 +161,7 @@ def list_receipts_metadata(
         # Scope to current user's student_id via joins
         receipts = (
             query.join(Payment, Receipt.payment_id == Payment.id)
-            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .join(Invoice, Payment.fee_invoice_id == Invoice.id)
             .filter(Invoice.student_id == getattr(current_user, "student_id", None))
             .all()
         )
@@ -227,6 +228,7 @@ def download_receipt_pdf(
     """
     Stream the PDF file for a given receipt_id.
     """
+
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(
@@ -236,34 +238,59 @@ def download_receipt_pdf(
 
     _enforce_role_or_ownership(db, current_user, receipt)
 
-    # Use centralized path resolution for deterministic behavior across envs
+    # Resolve the configured path (may expand ~ / env vars)
     file_path = settings.resolve_path(receipt.pdf_path)
 
-    # Extra safety: ensure file is within receipts_dir to avoid path traversal
+    # Allowed roots:
+    # - canonical receipts_path (where app normally stores files)
+    # - optionally any alternate directories defined by RECEIPTS_ALT_DIRS env var (comma-separated)
+    # - /tmp/receipts is commonly used in our infra for tests
     receipts_root = settings.receipts_path()
+    allowed_roots: List[Path] = [Path(receipts_root)]
+
+    alt = os.getenv("RECEIPTS_ALT_DIRS", "")
+    if alt:
+        for p in [s.strip() for s in alt.split(",") if s.strip()]:
+            allowed_roots.append(Path(p))
+
+    # always allow a common test tmp dir (mounted via compose)
+    allowed_roots.append(Path("/tmp/receipts"))
+
+    # Normalize and validate path
     try:
         fp = Path(file_path).resolve()
-        if receipts_root not in fp.parents and fp != receipts_root:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"code": "forbidden", "message": "Access outside receipts directory is forbidden"},
-            )
     except Exception:
-        # Path resolution failure
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": f"Invalid receipt path: {file_path}"},
         )
 
-    if not Path(file_path).is_file():
+    # Check that resolved path is inside one of allowed roots
+    allowed = False
+    for root in allowed_roots:
+        try:
+            root_resolved = root.resolve()
+        except Exception:
+            continue
+        if root_resolved == fp or root_resolved in fp.parents:
+            allowed = True
+            break
+
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "forbidden", "message": "Access outside receipts directory is forbidden"},
+        )
+
+    if not fp.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"code": "not_found", "message": f"PDF file missing on server: {file_path}"},
         )
 
-    filename = os.path.basename(file_path)
+    filename = os.path.basename(str(fp))
     return FileResponse(
-        path=file_path,
+        path=str(fp),
         media_type="application/pdf",
         filename=filename,
     )

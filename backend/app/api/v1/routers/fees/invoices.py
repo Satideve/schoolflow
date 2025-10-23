@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.session import get_db
 from app.models.fee.fee_invoice import FeeInvoice
 from app.models.user import User
+from app.models.student import Student
 from app.schemas.fee.invoice import InvoiceCreate, InvoiceOut
 from app.services.fee.fees_service import FeesService
 from app.services.payments.fake_adapter import FakePaymentAdapter
@@ -49,6 +50,14 @@ def create_invoice(
         f"action=create_invoice request_id={request.state.request_id} "
         f"user_id={current_user.id} student_id={payload.student_id} invoice_no={payload.invoice_no}"
     )
+
+    # Fast-fail: ensure target student exists (avoid FK errors and confusing 500/409s)
+    student = db.query(Student).filter(Student.id == payload.student_id).first()
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Student with id {payload.student_id} not found",
+        )
 
     existing = db.query(FeeInvoice).filter(FeeInvoice.invoice_no == payload.invoice_no).first()
     if existing:

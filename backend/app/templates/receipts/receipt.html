@@ -1,4 +1,4 @@
-<!-- backend/app/templates/receipts/receipt.html -->
+# backend/app/templates/receipts/receipt.html
 <!doctype html>
 <html>
   <head>
@@ -38,7 +38,11 @@
             {%- for it in items -%}
               <tr>
                 <td>{{ it.description or ("Component " ~ (it.id if it.id else "")) }}</td>
-                <td class="right">{{ ('%.2f'|format(it.amount)) if it.amount is not none else '-' }}</td>
+                {# show item.amount when present; else fall back to receipt amount or paid_amount #}
+                <td class="right">
+                  {%- set display_amount = it.amount if it.amount is not none else (amount if amount is not none else (paid_amount if paid_amount is not none else None)) -%}
+                  {{ ('%.2f'|format(display_amount)) if display_amount is not none else '-' }}
+                </td>
               </tr>
             {%- endfor -%}
           {%- else -%}
@@ -53,7 +57,7 @@
 
     <div class="section">
       <strong>Payment Transaction:</strong> {{ payment.provider_txn_id if payment else '' }}<br/>
-      <strong>Paid At:</strong> {{ (payment.created_at if payment and getattr(payment, 'created_at', None) else '') }}
+      <strong>Paid At:</strong> {{ payment.created_at if payment and payment.created_at else '' }}
     </div>
 
     <footer>

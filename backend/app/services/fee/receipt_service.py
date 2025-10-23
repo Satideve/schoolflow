@@ -7,13 +7,16 @@ This module provides a reusable class `ReceiptService` that:
 - Creates a receipt record in the database for a given payment_id
 - Records the user who created the receipt (created_by)
 - Generates a canonical receipt number if none is provided
-- Computes the final PDF path
+- Computes the final PDF path (persisted BEFORE rendering so other parts can find it)
 - Loads rendering context from the database
 - Renders the receipt PDF using the standard template and options
 
-This service is the canonical path for generating receipts across all flows.
+Key change (robustness): set `Receipt.pdf_path` to a deterministic path *before*
+calling the rendering op. This ensures the DB always contains the final path
+and avoids races where another request tries to download the receipt while
+the rendering is happening. The rendering op still re-renders the file at the
+path we choose.
 """
-
 from __future__ import annotations
 
 import logging
@@ -30,9 +33,11 @@ from app.ops.create_receipt import main as ops_create_and_render
 from app.schemas.fee.receipt import ReceiptOut
 from app.models.user import User
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 logger = logging.getLogger("app.services.receipt_service")
 
+# Keep an on-disk receipts dir default for local runs (tests / dev)
 RECEIPTS_DIR = Path("app/data/receipts")
 RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -185,6 +190,27 @@ class ReceiptService:
         logger.warning("resolve_created_by: fallback created_by=1")
         return 1
 
+    def _compute_pdf_path(self, receipt_no: str, receipt_id: int | None = None) -> str:
+        """
+        Compute a deterministic absolute path for a receipt PDF and return it as string.
+
+        Preference:
+         - Use settings.receipts_path() when available (resolves using settings.base_dir).
+         - Fallback to repository-local RECEIPTS_DIR.
+         - Filename: <receipt_no>.pdf (avoid embedding DB id in name so file names are stable).
+        """
+        try:
+            base = settings.receipts_path()
+        except Exception:
+            base = RECEIPTS_DIR
+
+        # Ensure path exists
+        base = Path(base)
+        base.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{receipt_no}.pdf"
+        return str((base / filename).resolve())
+
     def create_receipt_and_render(
         self,
         payment_id: int,
@@ -193,9 +219,9 @@ class ReceiptService:
     ) -> ReceiptOut:
         """
         1. Validate payment→invoice→student relationship.
-        2. Persist a new Receipt row (with blank pdf_path and created_by).
+        2. Persist a new Receipt row with a deterministic pdf_path (so DB is consistent).
         3. Call the ops script to generate/render the PDF; it returns the file path.
-        4. Update the Receipt.pdf_path, commit, refresh, and return a ReceiptOut.
+        4. Update the Receipt.pdf_path (if ops changed it), commit, refresh, and return a ReceiptOut.
         """
         # Step 1: validation
         payment = self.validate_payment_for_receipt(payment_id)
@@ -206,19 +232,22 @@ class ReceiptService:
         # Resolve created_by to a non-None, valid user id
         created_by_id = self._resolve_created_by(created_by)
 
-        # Step 2: insert with placeholder (pdf_path empty for now)
+        # Step 2: compute deterministic pdf path and insert the Receipt
+        pdf_path_guess = self._compute_pdf_path(receipt_no)
+
         new_receipt = Receipt(
             payment_id=payment_id,
             receipt_no=receipt_no,
-            pdf_path="",
+            pdf_path=str(pdf_path_guess),
             created_by=created_by_id,
         )
         self.db.add(new_receipt)
-        self.db.flush()  # populates new_receipt.id
+        # Flush to populate new_receipt.id (but don't commit yet so we can rollback if render fails)
+        self.db.flush()
 
-        # Step 3: generate PDF via the ops script
-        # ops_create_and_render is expected to return the final absolute/relative path
+        # Step 3: generate PDF via the ops script (isolated process-level rendering)
         try:
+            # ops_create_and_render expects a receipt_id and will re-render at receipt.pdf_path (which we just set)
             generated_pdf_path = ops_create_and_render(new_receipt.id)
         except Exception as e:
             # If PDF generation fails, rollback addition of receipt to keep DB consistent
@@ -229,9 +258,26 @@ class ReceiptService:
                 detail={"code": "render_failed", "message": str(e)},
             )
 
-        # Step 4: persist the actual path
-        new_receipt.pdf_path = str(generated_pdf_path)
-        self.db.commit()
-        self.db.refresh(new_receipt)
+        # Step 4: persist the actual path (ops may have returned a path)
+        try:
+            # Prefer the path returned by ops if non-empty, else keep the one we set
+            if generated_pdf_path:
+                new_receipt.pdf_path = str(generated_pdf_path)
+            else:
+                # ensure at least the guessed path is persisted
+                new_receipt.pdf_path = str(pdf_path_guess)
+            self.db.commit()
+            self.db.refresh(new_receipt)
+        except Exception:
+            # If commit fails, try to rollback and raise a 500-like error
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
+            logger.exception("create_receipt_and_render: failed to commit receipt after rendering for id=%s", new_receipt.id)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"code": "db_error", "message": "Failed to persist receipt after rendering"},
+            )
 
         return ReceiptOut.from_orm(new_receipt)

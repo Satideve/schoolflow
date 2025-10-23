@@ -39,6 +39,9 @@ RUN apk add --no-cache \
       py3-bcrypt \
  && pip install --upgrade pip
 
+# --- New change: force install compatible bcrypt 4.3.0 for Passlib ---
+RUN pip install --no-cache-dir 'bcrypt==4.3.0'
+
 # 3. Install Poetry (direct pip install is simpler & deterministic in Docker)
 RUN pip install --no-cache-dir poetry
 
@@ -56,10 +59,13 @@ RUN poetry config virtualenvs.create false \
 
 # NOTE: we intentionally do NOT attempt to compile bcrypt from source here.
 # Instead we rely on the Alpine-provided py3-bcrypt package installed above,
-# which supplies a working bcrypt extension built for musl.
+# and explicitly pinned bcrypt==4.3.0 for Passlib compatibility.
 
 # 7. Copy the rest of the backend source code
 COPY ../backend ./
+
+# Fix permissions for scripts in ops (useful on Windows hosts)
+# RUN chmod -R 755 /app/backend/ops || true
 
 # 8. Drop privileges: create and switch to a non-root user
 RUN addgroup --system appgroup \

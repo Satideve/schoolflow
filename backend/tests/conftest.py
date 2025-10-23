@@ -34,7 +34,15 @@ TESTS_TMP_DATA = BACKEND_DIR / "tmp_data"
 # Test DB file placed inside backend directory
 TEST_DB_FILENAME = ".pytest_test_db.sqlite"
 TEST_DB_PATH = BACKEND_DIR / TEST_DB_FILENAME
-TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
+# TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
+
+USE_REAL_DB = os.getenv("USE_REAL_DB", "false").lower() in {"1", "true", "yes"}
+
+if USE_REAL_DB:
+    TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@infra-db-1:5432/schoolflow")
+else:
+    TEST_DATABASE_URL = "sqlite:///./.pytest_test_db.sqlite"
+
 
 # Ensure tests tmp dir is prepared (clean start)
 try:
@@ -76,11 +84,24 @@ try:
 except Exception:
     pass
 
-_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# _engine = create_engine(
+#     TEST_DATABASE_URL,
+#     connect_args={"check_same_thread": False},
+#     poolclass=StaticPool,
+# )
+
+# detect DB type & set sqlite-only connect args only when appropriate
+from sqlalchemy.engine.url import make_url
+
+_db_url = TEST_DATABASE_URL  # existing var in your conftest
+_url_obj = make_url(_db_url)
+connect_args = {}
+if _url_obj.drivername and _url_obj.drivername.startswith("sqlite"):
+    # sqlite in-process requires this; postgres doesn't accept it
+    connect_args = {"check_same_thread": False}
+
+_engine = create_engine(_db_url, connect_args=connect_args)
+
 
 TestingSessionLocal = sessionmaker(
     autocommit=False,
@@ -160,7 +181,8 @@ def override_settings_base_dir():
     # teardown - nothing required here (atexit handles cleanup)
 
 
-@pytest.fixture(autouse=True)
+# @pytest.fixture(autouse=True)
+@pytest.fixture()
 def clear_db_between_tests():
     """
     Autouse fixture: run before every test to remove all rows from every table
@@ -208,6 +230,59 @@ def clear_db_between_tests():
         _log_table_counts(session, "after-post-test-cleanup")
     finally:
         session.close()
+
+# proceed — add this fixture to backend/tests/conftest.py (place after clear_db_between_tests)
+
+@pytest.fixture(autouse=True)
+def seed_base_students_after_cleanup(clear_db_between_tests):
+    """
+    Test-time helper: seed a base set of students after the test DB cleanup runs.
+
+    - This fixture depends on `clear_db_between_tests`, so it executes after
+      the cleanup and will therefore survive into each test.
+    - It creates a single ClassSection (if none exists) and then creates
+      `count` students (unique roll_numbers) so tests that expect students
+      with ids like 1,5,10,11,20 work reliably.
+    - We keep this lightweight and idempotent (it will only insert when the
+      students table is empty).
+    """
+    from app.models.class_section import ClassSection
+    from app.models.student import Student
+    from app.db.session import TestingSessionLocal
+    import uuid
+
+    db = TestingSessionLocal()
+    try:
+        # If students already exist for this test (some tests create their own),
+        # don't reseed here.
+        existing = db.query(Student).count()
+        if existing and existing > 0:
+            return
+
+        # Ensure a ClassSection exists
+        cs = db.query(ClassSection).first()
+        if not cs:
+            cs = ClassSection(name="TS-default", academic_year="2025-26")
+            db.add(cs)
+            db.flush()  # get cs.id
+
+        # Create enough students so IDs up to `count` will exist
+        # Tests reference ids up to ~20; create 30 to be safe.
+        count = 30
+        students = []
+        for i in range(count):
+            s = Student(
+                name=f"Seed S{i+1}",
+                roll_number=f"RN-{uuid.uuid4().hex[:8]}",
+                class_section_id=cs.id,
+            )
+            students.append(s)
+            db.add(s)
+        db.commit()
+        # No need to return anything; tests use their own fixtures as needed.
+    finally:
+        db.close()
+
 
 
 @pytest.fixture(scope="function")

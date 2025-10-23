@@ -1,5 +1,4 @@
 # backend/app/repositories/fee_repo.py
-
 """
 Repository methods for fee module.
 
@@ -140,21 +139,6 @@ def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
     return invoice
 
 
-# def create_receipt(
-#     db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
-# ) -> Receipt:
-#     # created_by kept optional to maintain compatibility with older code paths;
-#     # higher-level services (ReceiptService) will set created_by when appropriate.
-#     receipt = Receipt(
-#         payment_id=payment_id,
-#         receipt_no=receipt_no,
-#         pdf_path=pdf_path,
-#         created_by=created_by,
-#     )
-#     db.add(receipt)
-#     db.commit()
-#     db.refresh(receipt)
-#     return receipt
 def create_receipt(
     db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
 ) -> Receipt:
@@ -178,3 +162,42 @@ def create_receipt(
     db.refresh(receipt)
     return receipt
 
+
+# ----------------------------
+# Convenience listing / getters
+# ----------------------------
+def list_receipts(db: Session, limit: int | None = None) -> list[Receipt]:
+    """
+    Return receipts ordered by id descending (most recent first).
+    Optionally limit the number returned.
+    """
+    q = db.query(Receipt).order_by(Receipt.id.desc())
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
+
+
+def get_receipt_by_id(db: Session, receipt_id: int) -> Receipt | None:
+    return db.query(Receipt).filter(Receipt.id == receipt_id).first()
+
+
+def list_payments(db: Session, limit: int | None = None) -> list[Payment]:
+    q = db.query(Payment).order_by(Payment.id.desc())
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
+
+
+def get_payment_by_id(db: Session, payment_id: int) -> Payment | None:
+    return db.query(Payment).filter(Payment.id == payment_id).first()
+
+
+def list_invoices(db: Session, limit: int | None = None) -> list[FeeInvoice]:
+    q = db.query(FeeInvoice).order_by(FeeInvoice.id.desc())
+    if limit is not None:
+        q = q.limit(limit)
+    return q.all()
+
+
+def get_invoice_by_id(db: Session, invoice_id: int) -> FeeInvoice | None:
+    return db.query(FeeInvoice).filter(FeeInvoice.id == invoice_id).first()

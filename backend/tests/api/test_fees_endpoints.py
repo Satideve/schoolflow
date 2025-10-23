@@ -187,8 +187,15 @@ def test_payment_webhook_creates_receipt(auth_client, seed_invoice, monkeypatch)
 
     wh = auth_client.post("/api/v1/payments/webhook", json=payload)
     assert wh.status_code == 200, wh.text
+
     # After webhook, list receipts and assert a new receipt exists for this invoice
     rlist = auth_client.get("/api/v1/receipts/")
     assert rlist.status_code == 200, rlist.text
     receipts = rlist.json()
+
+    # Print the receipt IDs created for debugging / later test use
+    for r in receipts:
+        if str(invoice_id) in (r.get("pdf_path") or "") or r.get("payment_id"):
+            print(f"Test Receipt ID: {r.get('id')}")
+
     assert any("receipt_no" in r and (str(invoice_id) in (r.get("pdf_path") or "") or r.get("payment_id")) for r in receipts)
