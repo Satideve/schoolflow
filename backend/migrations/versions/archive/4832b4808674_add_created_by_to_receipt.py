@@ -1,4 +1,3 @@
-# file: 4832b4808674_add_created_by_to_receipt.py
 """add created_by to receipt
 
 Revision ID: 4832b4808674
@@ -7,8 +6,10 @@ Create Date: 2025-09-25 16:11:28.872458
 """
 
 from typing import Sequence, Union
+
 from alembic import op
 import sqlalchemy as sa
+
 
 # revision identifiers, used by Alembic.
 revision: str = '4832b4808674'
@@ -27,10 +28,7 @@ def upgrade() -> None:
 
     # 3) Backfill existing rows with a valid user id if available
     bind = op.get_bind()
-    try:
-        user_id = bind.execute(sa.text('SELECT id FROM "user" ORDER BY id LIMIT 1')).scalar()
-    except Exception:
-        user_id = None
+    user_id = bind.execute(sa.text('SELECT id FROM "user" ORDER BY id LIMIT 1')).scalar()
 
     if user_id is not None:
         # Backfill with the existing user's id
@@ -55,7 +53,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Drop FK if it exists (use the named constraint) — use autocommit block for safety
+    # Drop FK if it exists (use the named constraint)
     with op.get_context().autocommit_block():
         try:
             op.drop_constraint('fk_receipt_created_by_user', 'receipt', type_='foreignkey')
@@ -64,13 +62,7 @@ def downgrade() -> None:
             pass
 
     # Drop index
-    try:
-        op.drop_index(op.f('ix_receipt_created_by'), table_name='receipt')
-    except Exception:
-        pass
+    op.drop_index(op.f('ix_receipt_created_by'), table_name='receipt')
 
     # Drop column
-    try:
-        op.drop_column('receipt', 'created_by')
-    except Exception:
-        pass
+    op.drop_column('receipt', 'created_by')

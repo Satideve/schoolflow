@@ -1,5 +1,4 @@
-# backend/app/alembic/versions/20250929_inv_constraints.py
-
+# file: 20250929_inv_constraints.py
 """add constraints and indexes to fee_invoice
 
 Revision ID: 20250929_inv_constraints
@@ -34,7 +33,7 @@ def _index_exists_postgres(bind, index_name: str) -> bool:
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
+    """Upgrade schema: add unique constraint and useful indexes for fee_invoice."""
     conn = op.get_bind()
 
     if conn.dialect.name == "postgresql":
@@ -48,89 +47,84 @@ def upgrade() -> None:
         existing_constraints = {row[0] for row in existing_constraints}
 
         if "uq_fee_invoice_invoice_no" not in existing_constraints:
-            op.create_unique_constraint("uq_fee_invoice_invoice_no", "fee_invoice", ["invoice_no"])
+            # Attempt to create unique constraint; will fail if column missing, so ensure column exists
+            if _has_column(conn, "fee_invoice", "invoice_no"):
+                op.create_unique_constraint("uq_fee_invoice_invoice_no", "fee_invoice", ["invoice_no"])
 
         # Indexes: check existence before creating
         def ensure_index(name, table, cols, unique=False):
             if not _index_exists_postgres(conn, name):
                 op.create_index(name, table, cols, unique=unique)
 
-        ensure_index("ix_fee_invoice_invoice_no", "fee_invoice", ["invoice_no"], unique=True)
-        ensure_index("ix_fee_invoice_student_id", "fee_invoice", ["student_id"])
-        ensure_index("ix_fee_invoice_created_at", "fee_invoice", ["created_at"])
+        # Only create invoice_no index if column exists
+        if _has_column(conn, "fee_invoice", "invoice_no"):
+            ensure_index("ix_fee_invoice_invoice_no", "fee_invoice", ["invoice_no"], unique=True)
 
-    elif conn.dialect.name == "sqlite":
-        # SQLite: use batch mode but only create constraints/indexes if the column(s) exist.
-        # This avoids KeyError when running on a fresh DB where the column may not be present yet.
-        # Create unique constraint if invoice_no column exists
+        # student_id and created_at indexes are safe to create if their columns exist
+        if _has_column(conn, "fee_invoice", "student_id"):
+            ensure_index("ix_fee_invoice_student_id", "fee_invoice", ["student_id"])
+        if _has_column(conn, "fee_invoice", "created_at"):
+            ensure_index("ix_fee_invoice_created_at", "fee_invoice", ["created_at"])
+
+    else:
+        # SQLite or other dialects: use batch mode and guard on column existence
         if _has_column(conn, "fee_invoice", "invoice_no"):
             with op.batch_alter_table("fee_invoice") as batch_op:
-                batch_op.create_unique_constraint("uq_fee_invoice_invoice_no", ["invoice_no"])
-                # create index if column exists (create_index will use the column)
-                batch_op.create_index("ix_fee_invoice_invoice_no", ["invoice_no"], unique=True)
-        # student_id index
+                try:
+                    batch_op.create_unique_constraint("uq_fee_invoice_invoice_no", ["invoice_no"])
+                except Exception:
+                    pass
+                try:
+                    batch_op.create_index("ix_fee_invoice_invoice_no", ["invoice_no"], unique=True)
+                except Exception:
+                    pass
+
         if _has_column(conn, "fee_invoice", "student_id"):
             with op.batch_alter_table("fee_invoice") as batch_op:
-                batch_op.create_index("ix_fee_invoice_student_id", ["student_id"])
-        # created_at index
+                try:
+                    batch_op.create_index("ix_fee_invoice_student_id", ["student_id"])
+                except Exception:
+                    pass
+
         if _has_column(conn, "fee_invoice", "created_at"):
             with op.batch_alter_table("fee_invoice") as batch_op:
-                batch_op.create_index("ix_fee_invoice_created_at", ["created_at"])
+                try:
+                    batch_op.create_index("ix_fee_invoice_created_at", ["created_at"])
+                except Exception:
+                    pass
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
+    """Downgrade schema: remove constraints/indexes if present."""
     conn = op.get_bind()
 
     if conn.dialect.name == "postgresql":
-        # Drop indexes if they exist
+        # Drop indexes if they exist (using IF EXISTS)
         for idx in [
             "ix_fee_invoice_created_at",
             "ix_fee_invoice_student_id",
             "ix_fee_invoice_invoice_no",
         ]:
-            conn.execute(
-                sa.text(
-                    "DO $$ BEGIN "
-                    "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = :i) THEN "
-                    f"DROP INDEX {idx}; "
-                    "END IF; END $$;"
-                ).bindparams(i=idx)
-            )
+            try:
+                conn.execute(sa.text(f"DROP INDEX IF EXISTS {idx}"))
+            except Exception:
+                pass
 
         # Drop constraint if exists
-        conn.execute(
-            sa.text(
-                "DO $$ BEGIN "
-                "IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_fee_invoice_invoice_no') THEN "
-                "ALTER TABLE fee_invoice DROP CONSTRAINT uq_fee_invoice_invoice_no; "
-                "END IF; END $$;"
-            )
-        )
+        try:
+            conn.execute(sa.text("ALTER TABLE fee_invoice DROP CONSTRAINT IF EXISTS uq_fee_invoice_invoice_no"))
+        except Exception:
+            pass
 
-    elif conn.dialect.name == "sqlite":
-        # SQLite: drop indexes/constraints only if the column/index exists.
-        # Note: batch_alter_table drop_* helpers expect the named constraint/index to exist,
-        # so we check columns (best-effort) before attempting drops.
-        if _has_column(conn, "fee_invoice", "created_at"):
-            with op.batch_alter_table("fee_invoice") as batch_op:
+    else:
+        # SQLite: use batch_alter_table with guards
+        with op.batch_alter_table("fee_invoice") as batch_op:
+            for idx in ["ix_fee_invoice_created_at", "ix_fee_invoice_student_id", "ix_fee_invoice_invoice_no"]:
                 try:
-                    batch_op.drop_index("ix_fee_invoice_created_at")
+                    batch_op.drop_index(idx)
                 except Exception:
                     pass
-        if _has_column(conn, "fee_invoice", "student_id"):
-            with op.batch_alter_table("fee_invoice") as batch_op:
-                try:
-                    batch_op.drop_index("ix_fee_invoice_student_id")
-                except Exception:
-                    pass
-        if _has_column(conn, "fee_invoice", "invoice_no"):
-            with op.batch_alter_table("fee_invoice") as batch_op:
-                try:
-                    batch_op.drop_index("ix_fee_invoice_invoice_no")
-                except Exception:
-                    pass
-                try:
-                    batch_op.drop_unique_constraint("uq_fee_invoice_invoice_no")
-                except Exception:
-                    pass
+            try:
+                batch_op.drop_unique_constraint("uq_fee_invoice_invoice_no")
+            except Exception:
+                pass

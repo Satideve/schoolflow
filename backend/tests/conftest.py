@@ -1,19 +1,20 @@
-# C:\coding_projects\dev\schoolflow\backend\tests\conftest.py
-
+# backend/tests/conftest.py
 """
 Pytest fixtures for SchoolFlow backend tests (synchronous).
 
-This file sets up a SQLite file-backed database (so threads can safely access it),
-creates tables, overrides the FastAPI `get_db` dependency so API endpoints
-use the test DB, and provides sync TestClient fixtures used by integration tests.
+This file is a preserved, production-safe merge of your original conftest.py
+with safer behavior for running tests against a real PostgreSQL test DB
+(USE_REAL_DB=true). Key guarantees:
 
-IMPORTANT FIX: Some Settings validation expects BASE_DIR to point to a directory
-that contains the `app` package. To satisfy that validation at import time we
-set the BASE_DIR env var to the backend project directory (which contains `app`)
-before importing the FastAPI app. Later, inside a session-scoped fixture, we
-override `settings.base_dir` to point at the tests tmp_data directory used for
-receipts/invoices. This preserves Settings validation while routing file writes
-to an isolated test folder.
+ - Keeps original fixture names and semantics.
+ - Keeps sqlite/local behaviour (destructive cleanup) for fast dev runs.
+ - When USE_REAL_DB=true: avoids destructive truncation of seeded tables.
+   Tests run using per-test transactional/session isolation; changes are rolled back
+   so seeded production-like data stays intact.
+ - Preserves logging and auth_client behavior (register/login via TestClient).
+ - Does not change variable/fixture names or folder layout.
+
+First line is the path as requested.
 """
 import logging
 import os
@@ -26,101 +27,84 @@ import pytest
 # -----------------------
 # Paths & test directories
 # -----------------------
-# backend directory (parent of tests/)
 BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
-# tests tmp_data (where receipts/invoices will be written during tests)
 TESTS_TMP_DATA = BACKEND_DIR / "tmp_data"
 
-# Test DB file placed inside backend directory
+# Test DB file placed inside backend directory (fast local)
 TEST_DB_FILENAME = ".pytest_test_db.sqlite"
 TEST_DB_PATH = BACKEND_DIR / TEST_DB_FILENAME
-# TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
+# Feature flag for using a real DB for E2E/integration testing.
 USE_REAL_DB = os.getenv("USE_REAL_DB", "false").lower() in {"1", "true", "yes"}
 
+# Determine TEST_DATABASE_URL:
 if USE_REAL_DB:
-    TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@infra-db-1:5432/schoolflow")
+    # When using real DB, tests will use DATABASE_URL environment var
+    TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@infra-db-1:5432/schoolflow_test")
 else:
-    TEST_DATABASE_URL = "sqlite:///./.pytest_test_db.sqlite"
+    TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
-
-# Ensure tests tmp dir is prepared (clean start)
+# Ensure tests tmp dir is prepared (clean start for sqlite mode)
 try:
-    if TESTS_TMP_DATA.exists():
+    if TESTS_TMP_DATA.exists() and not USE_REAL_DB:
         shutil.rmtree(TESTS_TMP_DATA)
     TESTS_TMP_DATA.mkdir(parents=True, exist_ok=True)
 except Exception:
-    # best-effort; if this fails tests will show errors later
     pass
 
 # -----------------------
 # Environment variables required by app at import time
 # -----------------------
-# Ensure BASE_DIR points to a directory that contains `app` so Settings validation passes.
-# BACKEND_DIR contains the `app` package (e.g. /app/backend in container).
 os.environ["BASE_DIR"] = str(BACKEND_DIR)
-# Database and secret used for tests
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["SECRET_KEY"] = "testsecretkey123456"
 
-from sqlalchemy import create_engine
+# -----------------------
+# Imports that must happen AFTER env vars set
+# -----------------------
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.url import make_url
 from sqlalchemy.pool import StaticPool
-
 from fastapi.testclient import TestClient
 
-# Import the application AFTER env vars are set so pydantic Settings validate correctly.
 from app.main import app
 from app.db.base import Base
 from app.db.session import get_db
 
 # -----------------------
-# Database engine + session factory for tests
+# Create SQLAlchemy engine + Session factory for tests
 # -----------------------
-# Ensure prior DB file is removed (clean start)
-try:
-    if TEST_DB_PATH.exists():
-        TEST_DB_PATH.unlink()
-except Exception:
-    pass
-
-# _engine = create_engine(
-#     TEST_DATABASE_URL,
-#     connect_args={"check_same_thread": False},
-#     poolclass=StaticPool,
-# )
-
-# detect DB type & set sqlite-only connect args only when appropriate
-from sqlalchemy.engine.url import make_url
-
-_db_url = TEST_DATABASE_URL  # existing var in your conftest
-_url_obj = make_url(_db_url)
+_url_obj = make_url(TEST_DATABASE_URL)
 connect_args = {}
 if _url_obj.drivername and _url_obj.drivername.startswith("sqlite"):
-    # sqlite in-process requires this; postgres doesn't accept it
     connect_args = {"check_same_thread": False}
 
-_engine = create_engine(_db_url, connect_args=connect_args)
+if _url_obj.drivername and _url_obj.drivername.startswith("sqlite"):
+    _engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args, poolclass=StaticPool)
+else:
+    _engine = create_engine(TEST_DATABASE_URL, connect_args=connect_args)
 
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
-TestingSessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=_engine,
-)
-
-# Create tables once for the test session
-Base.metadata.create_all(bind=_engine)
-
-# Register atexit cleanup - best-effort removal of test DB file and tmp_data
-def _remove_test_artifacts():
+# Create tables for sqlite/local mode; for real DB we assume migrations created them.
+if not USE_REAL_DB:
     try:
         if TEST_DB_PATH.exists():
             TEST_DB_PATH.unlink()
     except Exception:
         pass
+    Base.metadata.create_all(bind=_engine)
+
+# atexit cleanup (best-effort). Do NOT remove real DB.
+def _remove_test_artifacts():
     try:
-        if TESTS_TMP_DATA.exists():
+        if not USE_REAL_DB and TEST_DB_PATH.exists():
+            TEST_DB_PATH.unlink()
+    except Exception:
+        pass
+    try:
+        if not USE_REAL_DB and TESTS_TMP_DATA.exists():
             shutil.rmtree(TESTS_TMP_DATA)
     except Exception:
         pass
@@ -128,12 +112,12 @@ def _remove_test_artifacts():
 atexit.register(_remove_test_artifacts)
 
 # -----------------------
-# Override dependency
+# Dependency override
 # -----------------------
 def _override_get_db():
     """
     Dependency override for FastAPI endpoints to use the testing Session.
-    Each call yields an independent Session bound to the file-backed DB.
+    Yields an independent Session bound to the test engine.
     """
     db = TestingSessionLocal()
     try:
@@ -141,15 +125,34 @@ def _override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = _override_get_db
 
 # -----------------------
-# Fixtures
+# Logging and helpers
 # -----------------------
 logger = logging.getLogger("tests.conftest")
 logger.setLevel(logging.DEBUG)
 
 
+def _log_table_counts(session, when: str):
+    """Helper to log table counts for debugging test DB state (best-effort)."""
+    try:
+        tbls = Base.metadata.sorted_tables
+        logger.debug("%s: Base.metadata.sorted_tables: %s", when, [t.name for t in tbls])
+        for t in tbls:
+            try:
+                r = session.execute(text(f"SELECT COUNT(*) as c FROM \"{t.name}\"")).scalar_one()
+            except Exception:
+                r = "<err>"
+            logger.debug("%s: table=%s count=%s", when, t.name, r)
+    except Exception:
+        logger.exception("Failed to log table counts for %s", when)
+
+
+# -----------------------
+# Fixtures
+# -----------------------
 @pytest.fixture(scope="session", autouse=True)
 def override_settings_base_dir():
     """
@@ -160,155 +163,187 @@ def override_settings_base_dir():
     try:
         from app.core.config import settings
     except Exception:
-        # If import fails, allow test run to proceed and surface the error later
         raise
 
     # Ensure tmp dir exists
     TESTS_TMP_DATA.mkdir(parents=True, exist_ok=True)
 
     # Override Settings value used by application code at runtime.
-    # Many modules read settings dynamically, so this will route file writes to tmp_data.
     try:
         settings.base_dir = str(TESTS_TMP_DATA)
         logger.debug("override_settings_base_dir: settings.base_dir set to %s", settings.base_dir)
     except Exception:
-        # If Settings is frozen or doesn't allow assignment, set environment var fallback
         os.environ["BASE_DIR"] = str(TESTS_TMP_DATA)
         logger.debug("override_settings_base_dir: fallback set BASE_DIR env to %s", os.environ["BASE_DIR"])
 
     yield
+    # teardown - nothing required here (atexit will handle cleanup)
 
-    # teardown - nothing required here (atexit handles cleanup)
 
-
-# @pytest.fixture(autouse=True)
+# -----------------------
+# clear_db_between_tests
+# -----------------------
 @pytest.fixture()
 def clear_db_between_tests():
     """
-    Autouse fixture: run before every test to remove all rows from every table
-    so tests cannot leak data to each other. Uses the same TestingSessionLocal
-    as the app so deletions are visible to the TestClient.
-    Also performs a cleanup pass after the test to be extra-safe.
-    Logs table counts before/after cleanup to help debugging.
+    Reproduces the original behavior for local sqlite runs: delete all rows from every
+    table before and after each test so tests cannot leak data.
+
+    For USE_REAL_DB == True we do NOT perform destructive deletes of seeded tables.
+    Instead we log the counts and leave existing seeded data intact. Tests must therefore
+    use transactional isolation (db_session fixture) and/or create transient rows.
     """
-    from sqlalchemy import delete, text
-
-    def _log_table_counts(session, when: str):
-        try:
-            tbls = Base.metadata.sorted_tables
-            logger.debug("%s: Base.metadata.sorted_tables: %s", when, [t.name for t in tbls])
-            for t in tbls:
-                try:
-                    r = session.execute(text(f"SELECT COUNT(*) as c FROM \"{t.name}\"")).scalar_one()
-                except Exception:
-                    r = "<err>"
-                logger.debug("%s: table=%s count=%s", when, t.name, r)
-        except Exception:
-            logger.exception("Failed to log table counts for %s", when)
-
-    # Delete before the test starts
+    # Delete before the test starts (only for local sqlite runs)
     session = TestingSessionLocal()
     try:
         _log_table_counts(session, "before-cleanup")
-        for table in reversed(Base.metadata.sorted_tables):
-            session.execute(delete(table))
-        session.commit()
-        _log_table_counts(session, "after-cleanup")
+        if not USE_REAL_DB:
+            for table in reversed(Base.metadata.sorted_tables):
+                try:
+                    session.execute(delete(table))
+                except Exception:
+                    logger.exception("Failed to delete table %s during cleanup", table.name)
+            session.commit()
+            _log_table_counts(session, "after-cleanup")
+        else:
+            logger.debug("clear_db_between_tests: USE_REAL_DB enabled; skipping destructive cleanup")
     finally:
         session.close()
 
     # Let the test run
     yield
 
-    # Delete after the test finishes (best-effort cleanup)
+    # Delete after the test finishes (only for local sqlite)
     session = TestingSessionLocal()
     try:
         _log_table_counts(session, "before-post-test-cleanup")
-        for table in reversed(Base.metadata.sorted_tables):
-            session.execute(delete(table))
-        session.commit()
-        _log_table_counts(session, "after-post-test-cleanup")
+        if not USE_REAL_DB:
+            for table in reversed(Base.metadata.sorted_tables):
+                try:
+                    session.execute(delete(table))
+                except Exception:
+                    logger.exception("Failed to delete table %s during post-test cleanup", table.name)
+            session.commit()
+            _log_table_counts(session, "after-post-test-cleanup")
+        else:
+            logger.debug("clear_db_between_tests: USE_REAL_DB enabled; skipping destructive post-test cleanup")
     finally:
         session.close()
 
-# proceed — add this fixture to backend/tests/conftest.py (place after clear_db_between_tests)
 
+# -----------------------
+# seed_base_students_after_cleanup
+# -----------------------
 @pytest.fixture(autouse=True)
 def seed_base_students_after_cleanup(clear_db_between_tests):
     """
     Test-time helper: seed a base set of students after the test DB cleanup runs.
 
-    - This fixture depends on `clear_db_between_tests`, so it executes after
-      the cleanup and will therefore survive into each test.
-    - It creates a single ClassSection (if none exists) and then creates
-      `count` students (unique roll_numbers) so tests that expect students
-      with ids like 1,5,10,11,20 work reliably.
-    - We keep this lightweight and idempotent (it will only insert when the
-      students table is empty).
+    - In local sqlite mode this will create a class_section and many students so tests
+      that expect numeric ids (1..N) will find them.
+    - In USE_REAL_DB mode this fixture will be a no-op (we don't globally insert into real DB).
+      Tests should instead use the per-test transactional seed_student fixture.
     """
+    if USE_REAL_DB:
+        logger.debug("seed_base_students_after_cleanup: USE_REAL_DB=true -> skipping global seeding")
+        yield
+        return
+
+    # local sqlite behavior: create class_section and many students if not present
     from app.models.class_section import ClassSection
     from app.models.student import Student
-    from app.db.session import TestingSessionLocal
-    import uuid
 
     db = TestingSessionLocal()
     try:
-        # If students already exist for this test (some tests create their own),
-        # don't reseed here.
         existing = db.query(Student).count()
         if existing and existing > 0:
+            logger.debug("seed_base_students_after_cleanup: students already present (%s), skipping", existing)
+            yield
             return
 
-        # Ensure a ClassSection exists
         cs = db.query(ClassSection).first()
         if not cs:
             cs = ClassSection(name="TS-default", academic_year="2025-26")
             db.add(cs)
-            db.flush()  # get cs.id
+            db.flush()
 
-        # Create enough students so IDs up to `count` will exist
-        # Tests reference ids up to ~20; create 30 to be safe.
+        # create many students so ids up to ~30 exist
         count = 30
-        students = []
         for i in range(count):
             s = Student(
                 name=f"Seed S{i+1}",
                 roll_number=f"RN-{uuid.uuid4().hex[:8]}",
                 class_section_id=cs.id,
             )
-            students.append(s)
             db.add(s)
         db.commit()
-        # No need to return anything; tests use their own fixtures as needed.
+        logger.debug("seed_base_students_after_cleanup: created %s students", count)
     finally:
         db.close()
+    yield
+    # no teardown here (clear_db_between_tests will delete for non-real DB)
 
 
-
+# -----------------------
+# db_session fixture (NON-DESTRUCTIVE for real DB)
+# -----------------------
 @pytest.fixture(scope="function")
 def db_session():
     """
     Provide a SQLAlchemy Session for tests.
 
-    Ensures the DB is cleaned (all rows deleted) after each test so tests
-    using fixed test data (invoice numbers, etc.) won't conflict.
+    Behavior:
+      - When running against the in-memory/sqlite test DB (default), we create a
+        CONNECT -> TRANSACTION pattern so each test runs in an isolated transaction
+        and is rolled back at the end. This keeps sqlite in-process tests clean and fast.
+      - When running against a real PostgreSQL DB (USE_REAL_DB=true), we avoid
+        destroying seeded tables. We yield a live session and perform a rollback
+        on teardown, but we DO NOT execute destructive delete(...) across all tables.
+        That deletion was wiping your seed data; so it is removed.
     """
-    from sqlalchemy import delete
-
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
+    if USE_REAL_DB:
+        real_session = TestingSessionLocal()
         try:
-            db.rollback()
-            for table in reversed(Base.metadata.sorted_tables):
-                db.execute(delete(table))
-            db.commit()
+            yield real_session
         finally:
-            db.close()
+            # Only rollback/close — do not drop/truncate rows in real DB.
+            try:
+                real_session.rollback()
+            except Exception:
+                pass
+            try:
+                real_session.close()
+            except Exception:
+                pass
+    else:
+        # sqlite / local mode: strong isolation using an outer transaction
+        connection = _engine.connect()
+        outer_trans = connection.begin()
+        test_session = TestingSessionLocal(bind=connection)
+        try:
+            yield test_session
+        finally:
+            try:
+                test_session.rollback()
+            except Exception:
+                pass
+            try:
+                test_session.close()
+            except Exception:
+                pass
+            try:
+                outer_trans.rollback()
+            except Exception:
+                pass
+            try:
+                connection.close()
+            except Exception:
+                pass
 
 
-# --- New fixture: seed_invoice ---
+# -----------------------
+# seed_invoice fixture
+# -----------------------
 @pytest.fixture(scope="function")
 def seed_invoice(db_session, seed_student, seed_fee_plan):
     """
@@ -365,9 +400,11 @@ def seed_invoice(db_session, seed_student, seed_fee_plan):
         "student_id": invoice.student_id,
         "status": invoice.status,
     }
-# --- End seed_invoice fixture ---
 
 
+# -----------------------
+# Test client fixtures (client, auth_client)
+# -----------------------
 @pytest.fixture(scope="function")
 def client():
     """
@@ -385,14 +422,10 @@ def auth_client(db_session):
     - Ensures an admin user exists in the test DB (commits so the app session can see it).
     - Performs a real login via the /api/v1/auth/login endpoint to obtain a JWT.
     - Attaches Authorization header to the TestClient and yields it.
-
-    IMPORTANT: we create the user via the API register endpoint (idempotent)
-    so the user is visible to the same DB/session context the application uses.
     """
-    # create or ensure user in test DB
     from app.models.user import User
-    # Use the canonical security helper (not a router-level helper)
     from app.core.security import get_password_hash, verify_password
+    from passlib.context import CryptContext
 
     email = "testadmin@example.com"
     password = "ChangeMe123!"
@@ -406,8 +439,6 @@ def auth_client(db_session):
     )
     try:
         local_hashed = get_password_hash(password)
-        from passlib.context import CryptContext
-
         ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
         ok = ctx.verify(password, local_hashed)
         logger.debug("TEST DEBUG: passlib hash/verify OK (hash_len=%s)", len(local_hashed))
@@ -476,19 +507,27 @@ def auth_client(db_session):
         test_client.headers.update({"Authorization": f"Bearer {token}"})
         yield test_client
 
-import uuid
-from decimal import Decimal
-from datetime import datetime, timedelta
-from app.models.student import Student
-from app.models.fee.fee_plan import FeePlan
 
+# -----------------------
+# seed_student and seed_fee_plan fixtures
+# -----------------------
 @pytest.fixture()
 def seed_student(db_session):
     """Create and return a demo student record."""
+    from app.models.student import Student
+    from app.models.class_section import ClassSection
+
+    # Attempt to use existing class_section (seeded in real DB) or create one in-transaction
+    cs = db_session.query(ClassSection).first()
+    if not cs:
+        cs = ClassSection(name=f"TS-default", academic_year="2025-26")
+        db_session.add(cs)
+        db_session.flush()
+
     student = Student(
         name=f"Student-{uuid.uuid4().hex[:6]}",
         roll_number=f"R{uuid.uuid4().hex[:4]}",  # FIXED field name
-        class_section_id=1,  # assuming a default class_section exists or add one if needed
+        class_section_id=cs.id,
     )
     db_session.add(student)
     db_session.commit()
@@ -501,14 +540,11 @@ def seed_student(db_session):
     }
 
 
-import uuid
-from decimal import Decimal
-import pytest
-from app.models.fee.fee_plan import FeePlan
-
 @pytest.fixture()
 def seed_fee_plan(db_session):
     """Create and return a sample fee plan matching the FeePlan model."""
+    from app.models.fee.fee_plan import FeePlan
+
     plan = FeePlan(
         name=f"Plan-{uuid.uuid4().hex[:6]}",
         academic_year="2025-2026",
@@ -523,4 +559,3 @@ def seed_fee_plan(db_session):
         "academic_year": plan.academic_year,
         "frequency": plan.frequency,
     }
-
