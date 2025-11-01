@@ -136,12 +136,83 @@ if ((Get-Date) -ge $deadline) {
 
 # ---- Optional: TRUNCATE DB (dangerous) ----
 # This block is robust to PowerShell quoting and captures stdout/stderr reliably.
+# if ($TruncateDB) {
+#   Info "WARNING: Truncating test DB tables (RESTART IDENTITY CASCADE)..."
 
-if ($TruncateDB) {
-  Info "Delegating truncation to ops/e2e/truncate_test_db.ps1"
-  & "$PSScriptRoot/ops/e2e/truncate_test_db.ps1"
-}
+#   # Stop any backend containers (avoid race where an old backend writes while we truncate)
+#   try {
+#     Info "Stopping backend containers to avoid races..."
+#     docker compose stop $BACKEND_SERVICE | Out-Null
+#   } catch {
+#     # ignore stop errors but log
+#     Err "Warning: unable to stop backend container (non-fatal): $($_.Exception.Message)"
+#   }
 
+#   Start-Sleep -Seconds 1
+
+#   # Helper to run a psql query and return output as string (captures stdout/stderr).
+#   function Run-PSQL {
+#     param(
+#       [string]$sql
+#     )
+#     # Escape single quotes for safe single-quote wrapper in the docker/psql command
+#     $escapedSql = $sql -replace "'", "''"
+
+#     # Build command string; wrap SQL in single-quotes so double-quotes inside SQL can be preserved
+#     $cmd = "docker compose exec $DB_SERVICE psql -U admin -d schoolflow_test_run -t -A -c '$escapedSql'"
+#     Write-Host "DEBUG: Running: $cmd"
+#     try {
+#       $out = Invoke-Expression $cmd 2>&1
+#       return @{ Success = $true; Output = ($out -join "`n") }
+#     } catch {
+#       return @{ Success = $false; Output = $_.Exception.Message }
+#     }
+#   }
+
+#   # Show counts before truncate
+#   Info "DEBUG: Counts BEFORE truncate (payment / receipt / fee_invoice / students)..."
+#   $pre_payment  = Run-PSQL -sql "SELECT COUNT(*) FROM payment;"
+#   $pre_receipt  = Run-PSQL -sql "SELECT COUNT(*) FROM receipt;"
+#   $pre_invoice  = Run-PSQL -sql "SELECT COUNT(*) FROM fee_invoice;"
+#   $pre_students = Run-PSQL -sql "SELECT COUNT(*) FROM students;"
+#   Write-Host "PRE truncate: payment=`$($pre_payment.Output.Trim())`, receipt=`$($pre_receipt.Output.Trim())`, invoice=`$($pre_invoice.Output.Trim())`, students=`$($pre_students.Output.Trim())`"
+
+#   # The safe truncate SQL — uses the working quoting form you confirmed
+#   $truncateSql = 'TRUNCATE receipt, payment, fee_assignment, fee_invoice, fee_plan_component, fee_component, fee_plan, students, class_sections, "\"user\"" RESTART IDENTITY CASCADE;'
+
+#   # Run truncate and capture the result
+#   Info "Executing TRUNCATE..."
+#   $truncateResult = Run-PSQL -sql $truncateSql
+#   if (-not $truncateResult.Success) {
+#     Err "Truncate failed: $($truncateResult.Output)"
+#     Err "Aborting E2E run. Please inspect DB and retry."
+#     exit 3
+#   } else {
+#     Info "Truncate command executed. psql output (first 400 chars):"
+#     $outSnippet = $truncateResult.Output.ToString()
+#     if ($outSnippet.Length -gt 400) { $outSnippet = $outSnippet.Substring(0,400) + "..." }
+#     Write-Host $outSnippet
+#   }
+
+#   Start-Sleep -Seconds 1
+
+#   # Show counts after truncate
+#   Info "DEBUG: Counts AFTER truncate (payment / receipt / fee_invoice / students)..."
+#   $post_payment  = Run-PSQL -sql "SELECT COUNT(*) FROM payment;"
+#   $post_receipt  = Run-PSQL -sql "SELECT COUNT(*) FROM receipt;"
+#   $post_invoice  = Run-PSQL -sql "SELECT COUNT(*) FROM fee_invoice;"
+#   $post_students = Run-PSQL -sql "SELECT COUNT(*) FROM students;"
+#   Write-Host "POST truncate: payment=`$($post_payment.Output.Trim())`, receipt=`$($post_receipt.Output.Trim())`, invoice=`$($post_invoice.Output.Trim())`, students=`$($post_students.Output.Trim())`"
+
+#   # Verify we actually cleared the key tables (abort if not zero)
+#   if (($post_payment.Output.Trim() -ne '0') -or ($post_receipt.Output.Trim() -ne '0') -or ($post_invoice.Output.Trim() -ne '0')) {
+#     Err "Truncate did NOT clear tables as expected. Aborting."
+#     Err "If you intentionally want to keep data, re-run with -TruncateDB:$false."
+#     exit 4
+#   }
+
+#   Info "Truncate complete."
+# }
 #   # end of ($TruncateDB)
 
 # ---- 3) Run seed script inside backend container (ensures sequences fixed as load_seeds includes fix) ----

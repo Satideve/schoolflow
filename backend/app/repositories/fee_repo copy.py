@@ -4,17 +4,6 @@ Repository methods for fee module.
 
 Contains helper functions for fee-plans, components, assignments, payments,
 and receipts. These are used across services and tests.
-
-Idempotency / conflict handling notes (MODIFIED):
-- create_payment implements idempotent insertion behaviour:
-  * If an existing Payment is found by idempotency_key or (provider, provider_txn_id)
-    we will only return it if the existing.payment.fee_invoice_id equals the requested
-    fee_invoice_id. This prevents silently returning a payment that belongs to a
-    different invoice.
-  * If an existing payment is found but belongs to a different invoice, a ValueError
-    is raised to indicate a conflicting transaction (caller should surface / handle it).
-  * On IntegrityError (concurrent insert), we rollback and re-query; the same invoice-id
-    check is applied to the re-queried row.
 """
 
 from sqlalchemy.orm import Session
@@ -22,7 +11,6 @@ from decimal import Decimal
 from datetime import datetime
 from typing import Optional
 import uuid
-from sqlalchemy.exc import IntegrityError
 
 from app.models.fee.fee_plan import FeePlan
 from app.models.fee.fee_component import FeeComponent
@@ -98,6 +86,12 @@ def create_invoice(
     due_date: datetime,
     invoice_no: Optional[str] = None,
 ) -> FeeInvoice:
+    """
+    Create a FeeInvoice. `invoice_no` is optional for backward compatibility:
+    - If caller supplies invoice_no, that value is used.
+    - If not supplied, a unique invoice_no will be generated (INV-XXXXXXXX).
+    This prevents NOT NULL constraint failures for code paths that didn't set invoice_no.
+    """
     if not invoice_no:
         invoice_no = f"INV-{uuid.uuid4().hex[:8].upper()}"
 
@@ -114,20 +108,6 @@ def create_invoice(
     return inv
 
 
-def _ensure_same_invoice_or_raise(existing: Payment, expected_invoice_id: int) -> Payment:
-    """
-    Helper: if `existing` belongs to expected_invoice_id return it,
-    otherwise raise ValueError to signal a conflicting transaction.
-    """
-    if existing.fee_invoice_id == expected_invoice_id:
-        return existing
-    raise ValueError(
-        f"Conflicting payment found (id={existing.id}) for provider={existing.provider} "
-        f"txn={existing.provider_txn_id}: existing.fee_invoice_id={existing.fee_invoice_id} "
-        f"!= expected_invoice_id={expected_invoice_id}"
-    )
-
-
 def create_payment(
     db: Session,
     fee_invoice_id: int,
@@ -137,35 +117,6 @@ def create_payment(
     status: str,
     idempotency_key: str | None = None
 ) -> Payment:
-    """
-    Create a Payment row in an idempotent and race-tolerant way.
-
-    Behaviour:
-    1. If idempotency_key provided -> try to find existing payment with same key.
-       - If found and matches fee_invoice_id -> return it (idempotent).
-       - If found but belongs to a different invoice -> raise ValueError (conflict).
-    2. If provider + provider_txn_id provided -> try to find existing payment with same pair.
-       - If found and matches fee_invoice_id -> return it.
-       - If found but belongs to a different invoice -> raise ValueError.
-    3. Attempt to insert a new payment.
-       - If commit raises IntegrityError (concurrent insert), rollback and re-query; apply same invoice-id check.
-    """
-    # 1) Idempotency key check
-    if idempotency_key:
-        existing = db.query(Payment).filter(Payment.idempotency_key == idempotency_key).first()
-        if existing:
-            return _ensure_same_invoice_or_raise(existing, fee_invoice_id)
-
-    # 2) Provider + provider_txn lookup
-    if provider and provider_txn_id:
-        existing = db.query(Payment).filter(
-            Payment.provider == provider,
-            Payment.provider_txn_id == provider_txn_id
-        ).first()
-        if existing:
-            return _ensure_same_invoice_or_raise(existing, fee_invoice_id)
-
-    # 3) Try insert new payment
     payment = Payment(
         fee_invoice_id=fee_invoice_id,
         provider=provider,
@@ -174,32 +125,10 @@ def create_payment(
         status=status,
         idempotency_key=idempotency_key
     )
-
     db.add(payment)
-    try:
-        db.commit()
-        db.refresh(payment)
-        return payment
-    except IntegrityError:
-        # Race or unique-constraint violation: rollback and re-query
-        db.rollback()
-
-        # Re-query by idempotency_key first
-        if idempotency_key:
-            existing = db.query(Payment).filter(Payment.idempotency_key == idempotency_key).first()
-            if existing:
-                return _ensure_same_invoice_or_raise(existing, fee_invoice_id)
-
-        # Then re-query by provider + txn
-        existing = db.query(Payment).filter(
-            Payment.provider == provider,
-            Payment.provider_txn_id == provider_txn_id
-        ).first()
-        if existing:
-            return _ensure_same_invoice_or_raise(existing, fee_invoice_id)
-
-        # If we didn't find an existing row, re-raise the IntegrityError (unexpected)
-        raise
+    db.commit()
+    db.refresh(payment)
+    return payment
 
 
 def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
@@ -213,6 +142,13 @@ def mark_invoice_paid(db: Session, invoice: FeeInvoice) -> FeeInvoice:
 def create_receipt(
     db: Session, payment_id: int, receipt_no: str, pdf_path: str, created_by: int | None = None
 ) -> Receipt:
+    """
+    Create and persist a Receipt.
+
+    - `created_by` is optional for backward compatibility.
+    - If not provided, fall back to a safe system/admin id (1) so NOT NULL DB constraints are satisfied.
+      (Higher-level code should pass a real user id when available.)
+    """
     created_by_val = created_by if created_by is not None else 1
 
     receipt = Receipt(
@@ -227,7 +163,14 @@ def create_receipt(
     return receipt
 
 
+# ----------------------------
+# Convenience listing / getters
+# ----------------------------
 def list_receipts(db: Session, limit: int | None = None) -> list[Receipt]:
+    """
+    Return receipts ordered by id descending (most recent first).
+    Optionally limit the number returned.
+    """
     q = db.query(Receipt).order_by(Receipt.id.desc())
     if limit is not None:
         q = q.limit(limit)
