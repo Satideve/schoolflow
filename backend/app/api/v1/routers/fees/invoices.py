@@ -25,8 +25,30 @@ from app.repositories.invoice_repo import (
 from app.core.config import settings
 from app.api.dependencies.auth import get_current_user, require_roles
 
+# Use context loader to compute items_total / total_due / paid_amount / balance / items
+from app.services.pdf.context_loader import load_invoice_context
+# NEW: allow on-demand PDF render if file is missing
+from app.services.pdf.renderer import render_invoice_pdf
+
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
 logger = logging.getLogger("app.audit.invoices")
+
+
+def _invoice_out_with_context(inv: FeeInvoice, db: Session) -> InvoiceOut:
+    """
+    Build InvoiceOut from ORM + merge PDF context values for parity with rendered PDFs.
+    Non-invasive: if keys are missing in context, we leave them as None.
+    """
+    base = InvoiceOut.from_orm(inv)
+    try:
+        ctx = load_invoice_context(inv.id, db)
+        merged = base.model_dump()
+        for k in ("items_total", "total_due", "paid_amount", "balance", "items"):
+            if k in ctx:
+                merged[k] = ctx.get(k)
+        return InvoiceOut(**merged)
+    except Exception:
+        return base
 
 
 @router.post(
@@ -51,7 +73,7 @@ def create_invoice(
         f"user_id={current_user.id} student_id={payload.student_id} invoice_no={payload.invoice_no}"
     )
 
-    # Fast-fail: ensure target student exists (avoid FK errors and confusing 500/409s)
+    # Ensure target student exists
     student = db.query(Student).filter(Student.id == payload.student_id).first()
     if not student:
         raise HTTPException(
@@ -61,9 +83,9 @@ def create_invoice(
 
     existing = db.query(FeeInvoice).filter(FeeInvoice.invoice_no == payload.invoice_no).first()
     if existing:
-        return InvoiceOut.from_orm(existing)
+        return _invoice_out_with_context(existing, db)
 
-    # Normalize/validate due_date robustly (accepts datetime, date, or ISO strings)
+    # Normalize/validate due_date (accept datetime/date/ISO str)
     due_date_val = payload.due_date
     try:
         if isinstance(due_date_val, datetime):
@@ -74,14 +96,11 @@ def create_invoice(
             try:
                 due_date = datetime.fromisoformat(due_date_val)
             except Exception:
-                try:
-                    parsed_date = date.fromisoformat(due_date_val)
-                    due_date = datetime.combine(parsed_date, datetime.min.time())
-                except Exception:
-                    raise ValueError("Invalid ISO datetime/date string")
+                parsed_date = date.fromisoformat(due_date_val)
+                due_date = datetime.combine(parsed_date, datetime.min.time())
         else:
             raise ValueError("Unsupported due_date type")
-    except ValueError as ve:
+    except Exception as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid due_date: {ve}")
 
     svc = FeesService(
@@ -99,7 +118,7 @@ def create_invoice(
             due_date=due_date,
             payment=payload.payment,
         )
-        db.commit()  # Ensure commit after invoice creation
+        db.commit()
         db.refresh(inv)
     except IntegrityError:
         db.rollback()
@@ -114,7 +133,7 @@ def create_invoice(
             detail=str(exc),
         )
 
-    return InvoiceOut.from_orm(inv)
+    return _invoice_out_with_context(inv, db)
 
 
 @router.get(
@@ -135,9 +154,8 @@ def list_invoices(
     logger.info(
         f"action=list_invoices request_id={request.state.request_id} user_id={current_user.id}"
     )
-
     invoices = repo_list_invoices(db)
-    return [InvoiceOut.from_orm(inv) for inv in invoices]
+    return [_invoice_out_with_context(inv, db) for inv in invoices]
 
 
 @router.get(
@@ -167,7 +185,7 @@ def read_invoice(
     if current_user.role not in ("admin", "clerk") and current_user.id != inv.student_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    return InvoiceOut.from_orm(inv)
+    return _invoice_out_with_context(inv, db)
 
 
 @router.get(
@@ -185,6 +203,8 @@ def download_invoice(
     """
     Stream the pre-generated PDF for a given invoice.
     Admin/clerk see all; students see only their own.
+
+    If the PDF file is missing, we render it on-demand using the current context.
     """
     logger.info(
         f"action=download_invoice request_id={request.state.request_id} "
@@ -203,11 +223,25 @@ def download_invoice(
 
     filename = f"INV-{inv.invoice_no}.pdf"
     pdf_path = settings.invoices_path() / filename
+
+    # On-demand render if file missing
     if not pdf_path.exists():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invoice PDF not found. Please generate it first.",
-        )
+        try:
+            ctx = load_invoice_context(inv.id, db)
+            # Ensure directory exists
+            Path(pdf_path.parent).mkdir(parents=True, exist_ok=True)
+            render_invoice_pdf(ctx, str(pdf_path))
+            logger.info(
+                "On-demand rendered invoice PDF to %s for invoice %s (id=%s)",
+                str(pdf_path),
+                inv.invoice_no,
+                inv.id,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Unable to render invoice PDF: {e}",
+            )
 
     return FileResponse(
         path=str(pdf_path),

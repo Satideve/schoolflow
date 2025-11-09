@@ -1,4 +1,4 @@
-# backend/app/templates/receipts/receipt.html
+<!-- backend/app/templates/receipts/receipt.html -->
 <!doctype html>
 <html>
   <head>
@@ -11,7 +11,9 @@
       table { width: 100%; border-collapse: collapse; }
       th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
       .right { text-align: right; }
+      tfoot td { font-weight: bold; background: #fafafa; }
       footer { margin-top: 16px; font-size: 0.85em; color: #666; }
+      .muted { color:#666; font-size:0.9em; }
     </style>
   </head>
   <body>
@@ -52,12 +54,61 @@
             </tr>
           {%- endif -%}
         </tbody>
+        <tfoot>
+          {# If items_total computed is present, show it #}
+          {%- if items_total is not none -%}
+          <tr>
+            <td class="right">Items Total</td>
+            <td class="right">{{ '%.2f'|format(items_total) }}</td>
+          </tr>
+          {%- endif -%}
+          <tr>
+            <td class="right">Total Due</td>
+            <td class="right">
+              {%- if total_due is not none -%}
+                {{ '%.2f'|format(total_due) }}
+              {%- elif amount is not none -%}
+                {{ '%.2f'|format(amount) }}
+              {%- elif amount_due is not none -%}
+                {{ '%.2f'|format(amount_due) }}
+              {%- else -%}-
+              {%- endif -%}
+            </td>
+          </tr>
+          <tr>
+            <td class="right">Paid Amount</td>
+            <td class="right">
+              {%- if paid_amount is not none -%}
+                {{ '%.2f'|format(paid_amount) }}
+              {%- elif payment and payment.amount is not none -%}
+                {{ '%.2f'|format(payment.amount) }}
+              {%- else -%}0.00
+              {%- endif -%}
+            </td>
+          </tr>
+          <tr>
+            <td class="right">Balance</td>
+            <td class="right">
+              {%- if balance is not none -%}
+                {{ '%.2f'|format(balance) }}
+              {%- else -%}
+                {%- set pd = (paid_amount if paid_amount is not none else (payment.amount if payment and payment.amount is not none else 0.0)) -%}
+                {%- set td = (total_due if total_due is not none else (amount if amount is not none else (amount_due if amount_due is not none else 0.0))) -%}
+                {{ '%.2f'|format(td - pd) }}
+              {%- endif -%}
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </div>
 
     <div class="section">
       <strong>Payment Transaction:</strong> {{ payment.provider_txn_id if payment else '' }}<br/>
-      <strong>Paid At:</strong> {{ payment.created_at if payment and payment.created_at else '' }}
+      <strong>Paid At:</strong> {{ payment.created_at.isoformat() if payment and payment.created_at else '' }}
+    </div>
+
+    <div class="section muted">
+      <small>Thank you. This is a system-generated receipt.</small>
     </div>
 
     <footer>

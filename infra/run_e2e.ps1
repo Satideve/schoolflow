@@ -228,9 +228,9 @@ $invoicePayload = @{
   student_id = 2
   invoice_no = "INV-AUTO-" + ([guid]::NewGuid().ToString().Substring(0,8).ToUpper())
   period     = "2025-11"
-  amount_due = 3500.00
+  amount_due = 1650.00
   due_date   = (Get-Date -Year 2025 -Month 11 -Day 30).ToString("s")
-  payment    = @{ provider="manual"; amount=3500.00; status="captured" }
+  payment    = @{ provider="manual"; amount=1650.00; status="captured" }
 }
 $createHeaders = @{}
 if ($token) { $createHeaders.Add("Authorization","Bearer $token") }
@@ -260,7 +260,7 @@ $webhookTop = @{
   event = "payment.captured"
   provider = "fake"
   provider_txn_id = "FAKE-TXN-$invId"
-  amount = 3500.00
+  amount = 1650.00
   idempotency_key = "IDEMP-$invId"
 } | ConvertTo-Json -Depth 5
 

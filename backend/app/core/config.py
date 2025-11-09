@@ -49,8 +49,11 @@ class Settings(BaseSettings):
     # Paths
     # Base dir should point to the backend root (…/backend)
     base_dir: Optional[str] = Field(None, env="BASE_DIR")
-    receipts_dir: str = Field("app/data/receipts", env="RECEIPTS_DIR")
-    invoices_dir: str = Field("app/data/invoices", env="INVOICES_DIR")
+    # receipts_dir: str = Field("app/data/receipts", env="RECEIPTS_DIR")
+    # invoices_dir: str = Field("app/data/invoices", env="INVOICES_DIR")
+
+    receipts_dir: str = Field("data/receipts", env="RECEIPTS_DIR")
+    invoices_dir: str = Field("data/invoices", env="INVOICES_DIR")
 
     # CORS
     cors_origins: List[str] = Field(default_factory=list, env="CORS_ORIGINS")        
