@@ -1,17 +1,4 @@
 <!-- backend/app/templates/invoices/invoice.html -->
-<!--
-  Invoice PDF template for SchoolFlow
-
-  Notes:
-  - Uses only variables already provided by load_invoice_context():
-      invoice_id, invoice_no, student_name, student, period, due_date, created_at,
-      items (list of {id, description, amount}), items_total, total_due,
-      paid_amount, balance, title ("Invoice"), document_type ("invoice")
-  - Styling is intentionally simple and print-friendly, similar to the earlier, cleaner look.
-  - Gracefully handles missing totals by falling back to amount/zeros.
-  - No external assets; all CSS inline for reliability in PDF rendering.
--->
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -19,201 +6,200 @@
   <title>{{ title or "Invoice" }} — {{ invoice_no }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root {
-      --fg: #1f2937;          /* gray-800 */
-      --muted: #6b7280;       /* gray-500 */
-      --light: #f8fafc;       /* slate-50 */
-      --border: #e5e7eb;      /* gray-200 */
-      --brand: #111827;       /* gray-900 */
-      --accent: #2563eb;      /* blue-600 */
-      --success: #16a34a;     /* green-600 */
-      --warning: #d97706;     /* amber-600 */
-      --danger: #dc2626;      /* red-600 */
+    /* Match receipt.html look and feel: simple, print-friendly, Arial, light borders */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      color: #222;
+      background: #fff;
     }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      color: var(--fg);
-      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-            Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
-      background: white;
+
+    .sheet {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0;
     }
-    .page {
-      padding: 28px 32px;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 10px;
-    }
+
     .brand {
-      font-weight: 800;
-      font-size: 20px;
-      letter-spacing: 0.2px;
-      color: var(--brand);
-    }
-    .doc-title {
+      text-align: center;
+      margin-bottom: 4px;
       font-weight: 700;
-      font-size: 18px;
+      font-size: 28px;
     }
-    .muted { color: var(--muted); }
+
+    .doctitle {
+      text-align: center;
+      margin: 0 0 6px 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .docid {
+      text-align: center;
+      margin-bottom: 12px;
+      color: #666;
+      font-size: 0.95em;
+    }
 
     .meta {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0,1fr));
-      gap: 10px 16px;
-      margin: 14px 0 8px;
+      margin: 12px 0;
+      border: none;          /* keep clean like receipt's key-value section */
+      border-radius: 0;
+      overflow: visible;
     }
-    .kv {
-      display: grid;
-      grid-template-rows: auto auto;
-      gap: 2px;
-    }
-    .kv label {
-      font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
-    }
-    .kv .val { font-weight: 600; }
 
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      color: white;
+    .meta-row {
+      display: block;        /* stack rows like receipt section lines */
+      padding: 4px 0;
+      border-bottom: none;
     }
-    .b-paid { background: var(--success); }
-    .b-pending { background: var(--warning); }
-    .b-unpaid { background: var(--danger); }
+
+    .meta-label {
+      font-weight: 700;
+      display: inline;
+    }
+
+    .meta-value {
+      display: inline;
+      margin-left: 6px;
+      color: #222;
+    }
+
+    .muted { color: #666; }
+    .small { font-size: 0.9em; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 16px;
+      margin: 8px 0;
     }
-    thead th {
-      text-align: left;
-      padding: 10px 12px;
-      border-bottom: 2px solid var(--border);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: var(--muted);
-      background: var(--light);
-    }
+
+    thead th,
     tbody td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: left;
     }
+
+    thead th {
+      background: #fff;
+      color: #222;
+      font-weight: 700;
+    }
+
     .num { text-align: right; white-space: nowrap; }
 
+    /* Totals box styled similar to receipt table footer */
     .totals {
       display: grid;
-      grid-template-columns: 1fr minmax(260px, 320px);
+      grid-template-columns: 1fr minmax(260px,320px);
       gap: 16px;
-      margin-top: 18px;
+      margin-top: 12px;
       align-items: start;
     }
-    .totals .box {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      background: #fff;
-    }
-    .totals table {
-      margin: 0; width: 100%;
-    }
-    .totals tr td {
+
+    .box {
       border: none;
-      padding: 6px 4px;
-      font-size: 13px;
+      padding: 0;
+      background: transparent;
     }
-    .totals tr td:first-child { color: var(--muted); }
+
+    .totals table {
+      margin: 0;
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .totals td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .totals .label { color: #666; }
+
     .totals .grand td {
-      font-weight: 800;
-      border-top: 2px solid var(--border);
-      padding-top: 10px;
+      font-weight: bold;
+      background: #fafafa;
     }
 
     footer {
-      margin-top: 24px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 12px;
-      color: var(--muted);
+      margin-top: 16px;
+      font-size: 0.85em;
+      color: #666;
+      border-top: none;
+      padding-top: 0;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .small { font-size: 12px; }
+
+    /* Print settings to keep clean like receipt */
+    @page { size: A4; margin: 18mm; }
+    @media print {
+      body { background: #fff; margin: 12mm; }
+      .sheet { box-shadow: none; margin: 0; }
+    }
   </style>
 </head>
 <body>
-  <div class="page">
-    <header>
-      <div class="brand">SchoolFlow</div>
-      <div class="doc-title">{{ title or "Invoice" }}</div>
-    </header>
+  <div class="sheet">
+    <div class="brand">SchoolFlow</div>
+    <div class="doctitle">{{ title or "Invoice" }}</div>
+    <div class="docid">Invoice: {{ invoice_no }}</div>
 
-    {# ----- STATUS BADGE (derived from totals) ----- #}
+    {# ---- Derived totals (kept from previous version for robustness) ---- #}
     {% set _items_total = items_total if items_total is not none else (amount if amount is not none else 0) %}
     {% set _total_due  = total_due  if total_due  is not none else _items_total %}
     {% set _paid       = paid_amount if paid_amount is not none else 0 %}
     {% set _balance    = balance if balance is not none else (_total_due - _paid) %}
     {% if _paid and _balance <= 0 %}
-      {% set badge = "PAID" %}{% set badge_cls = "b-paid" %}
+      {% set _status_text = "PAID" %}
     {% elif _paid and _balance > 0 %}
-      {% set badge = "PARTIAL" %}{% set badge_cls = "b-pending" %}
+      {% set _status_text = "PARTIAL" %}
     {% elif _total_due > 0 %}
-      {% set badge = "UNPAID" %}{% set badge_cls = "b-unpaid" %}
+      {% set _status_text = "UNPAID" %}
     {% else %}
-      {% set badge = "" %}{% set badge_cls = "" %}
+      {% set _status_text = "-" %}
     {% endif %}
 
-    <div class="meta">
-      <div class="kv">
-        <label>Invoice No</label>
-        <div class="val">{{ invoice_no }}</div>
+    <!-- Meta block (receipt-like stacked rows with bold labels) -->
+    <div class="meta" aria-label="Invoice meta">
+      <div class="meta-row">
+        <span class="meta-label">Invoice No:</span>
+        <span class="meta-value">{{ invoice_no }}</span>
       </div>
-      <div class="kv">
-        <label>Invoice ID</label>
-        <div class="val">{{ invoice_id }}</div>
+      <div class="meta-row">
+        <span class="meta-label">Invoice ID:</span>
+        <span class="meta-value">{{ invoice_id }}</span>
       </div>
-      <div class="kv">
-        <label>Student</label>
-        <div class="val">{{ student_name or "-" }}</div>
+      <div class="meta-row">
+        <span class="meta-label">Student:</span>
+        <span class="meta-value">{{ student_name or "-" }}</span>
       </div>
-      <div class="kv">
-        <label>Roll No</label>
-        <div class="val">
-          {% if student %}{{ student.roll_number or student.roll_no or "-" }}{% else %}-{% endif %}
-        </div>
+      <div class="meta-row">
+        <span class="meta-label">Roll No:</span>
+        <span class="meta-value">{% if student %}{{ student.roll_number or student.roll_no or "-" }}{% else %}-{% endif %}</span>
       </div>
-      <div class="kv">
-        <label>Period</label>
-        <div class="val">{{ period or "-" }}</div>
+      <div class="meta-row">
+        <span class="meta-label">Period:</span>
+        <span class="meta-value">{{ period or "-" }}</span>
       </div>
-      <div class="kv">
-        <label>Due Date</label>
-        <div class="val small">{{ due_date }}</div>
+      <div class="meta-row">
+        <span class="meta-label">Due Date:</span>
+        <span class="meta-value small">{{ due_date }}</span>
       </div>
-      <div class="kv">
-        <label>Created</label>
-        <div class="val small">{{ created_at }}</div>
+      <div class="meta-row">
+        <span class="meta-label">Created:</span>
+        <span class="meta-value small">{{ created_at }}</span>
       </div>
-      <div class="kv">
-        <label>Status</label>
-        <div class="val">
-          {% if badge %}<span class="badge {{ badge_cls }}">{{ badge }}</span>{% else %}-{% endif %}
-        </div>
+      <div class="meta-row">
+        <span class="meta-label">Status:</span>
+        <span class="meta-value">{{ _status_text }}</span>
       </div>
     </div>
 
+    <!-- Items (receipt-like table) -->
     <table aria-label="Invoice items">
       <thead>
         <tr>
@@ -243,24 +229,19 @@
       </tbody>
     </table>
 
-    <div class="totals">
-      <div class="box">
-        <div class="muted small">Terms</div>
-        <div class="small">Payment due by {{ due_date }}.</div>
-      </div>
 
       <div class="box">
         <table aria-label="Totals">
           <tr>
-            <td>Items Total</td>
+            <td class="label">Items Total</td>
             <td class="num">{{ '%.2f' % ((_items_total or 0) | float) }}</td>
           </tr>
           <tr>
-            <td>Total Due</td>
+            <td class="label">Total Due</td>
             <td class="num">{{ '%.2f' % ((_total_due or 0) | float) }}</td>
           </tr>
           <tr>
-            <td>Paid</td>
+            <td class="label">Paid</td>
             <td class="num">{{ '%.2f' % ((_paid or 0) | float) }}</td>
           </tr>
           <tr class="grand">
@@ -270,6 +251,14 @@
         </table>
       </div>
     </div>
+
+    <!-- Totals footer (styled like receipt tfoot) -->
+    <div class="totals">
+      <div class="box">
+        <div class="muted small">Terms</div>
+        <div class="small">Payment due by {{ due_date }}.</div>
+      </div>
+
 
     <footer>
       <div>Generated by SchoolFlow.</div>
