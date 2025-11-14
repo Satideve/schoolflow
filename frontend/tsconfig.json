@@ -1,0 +1,21 @@
+{
+  // C:\coding_projects\dev\schoolflow\frontend\tsconfig.json
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "ES2022"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "baseUrl": "src",
+    "paths": {
+      "~/*": ["./*"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,35 @@
+# Dependency directories
+node_modules/
+.pnpm/
+.pnp/
+.pnp.js
+
+# Build output
+dist/
+build/
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.*
+.DS_Store
+
+# Lock files
+pnpm-lock.yaml
+yarn.lock
+package-lock.json
+
+# Logs
+*.log
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Misc
+*.sublime-workspace
+*.sublime-project
