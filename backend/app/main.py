@@ -1,7 +1,10 @@
-# backend/app/main.py
+﻿# C:\coding_projects\dev\schoolflow\backend\app\main.py
 
 """
 FastAPI app factory for SchoolFlow with custom Swagger UI and static file mounts.
+This modified version augments CORS origins at runtime to include a local frontend
+origin for development (http://localhost:5173) if not already present.
+It preserves all existing variable and function names and behaviour.
 """
 
 from fastapi import FastAPI, Request
@@ -14,6 +17,8 @@ from fastapi.openapi.docs import (
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from uuid import uuid4
+import os
+from typing import List, Iterable, Union
 
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -27,6 +32,22 @@ from app.db.session import engine
 from app.api.v1.api import api_router
 
 
+def _normalize_origins(origins: Union[Iterable[str], str, None]) -> List[str]:
+    """
+    Normalize various forms of settings.cors_origins into a list of strings.
+    Accepts list/tuple of strings, single string, or None.
+    """
+    if origins is None:
+        return []
+    if isinstance(origins, (list, tuple)):
+        return [str(x) for x in origins if x]
+    # single string (comma separated?) — try to split on commas if present
+    s = str(origins)
+    if "," in s:
+        return [p.strip() for p in s.split(",") if p.strip()]
+    return [s] if s else []
+
+
 def create_app() -> FastAPI:
     setup_logging()
 
@@ -38,10 +59,21 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
-    # CORS: use dynamic origins and settings from config
+    # --- CORS setup (preserve settings but add local dev frontend origin safely) ---
+    # Normalize the configured origins
+    base_origins = _normalize_origins(settings.cors_origins)
+
+    # Default local dev origin we want to support during frontend dev
+    dev_origin = os.environ.get("DEV_FRONTEND_ORIGIN", "http://localhost:5173")
+
+    # If dev origin is not already allowed, append it (without removing existing entries)
+    if dev_origin and dev_origin not in base_origins:
+        base_origins.append(dev_origin)
+
+    # Keep the original settings' allow flags intact
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=base_origins,
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=settings.cors_allow_methods,
         allow_headers=settings.cors_allow_headers,
@@ -123,14 +155,14 @@ def create_app() -> FastAPI:
 
         injected = original_html.body.replace(
             b"</body>",
-            b"""
+            b'''
             <script>
               window.ui.initOAuth({
                 usePkceWithAuthorizationCodeGrant: true
               });
             </script>
             </body>
-            """,
+            ''',
         )
 
         return HTMLResponse(content=injected, status_code=200)
