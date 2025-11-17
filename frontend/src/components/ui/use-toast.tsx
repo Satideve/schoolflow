@@ -1,4 +1,4 @@
-// C:\coding_projects\dev\schoolflow\frontend\src\components\ui\use-toast.ts
+﻿/* C:\coding_projects\dev\schoolflow\frontend\src\components\ui\use-toast.tsx */
 import React, { createContext, useContext, useState, useCallback } from "react";
 import Toaster from "./toaster";
 

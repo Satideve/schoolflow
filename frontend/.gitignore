@@ -1,35 +1,6 @@
-# Dependency directories
+# C:\coding_projects\dev\schoolflow\frontend\.gitignore
 node_modules/
-.pnpm/
-.pnp/
-.pnp.js
-
-# Build output
 dist/
-build/
-
-# IDE/editor settings
-.vscode/
-.idea/
-
-# Environment files
-.env
-.env.*
+.vite/
 .DS_Store
-
-# Lock files
-pnpm-lock.yaml
-yarn.lock
-package-lock.json
-
-# Logs
-*.log
-
-# OS-specific
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Misc
-*.sublime-workspace
-*.sublime-project
+.env*
