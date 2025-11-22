@@ -51,7 +51,11 @@ def create_app() -> FastAPI:
         configured_origins = [configured_origins]
 
     # Combine configured origins with local dev ones (avoid duplicates)
-    allow_origins = list(dict.fromkeys([*configured_origins, *local_dev_origins])) if configured_origins else local_dev_origins
+    allow_origins = (
+        list(dict.fromkeys([*configured_origins, *local_dev_origins]))
+        if configured_origins
+        else local_dev_origins
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -82,7 +86,7 @@ def create_app() -> FastAPI:
         name="invoices",
     )
 
-    # Include all versioned API routers
+    # Include all versioned API routers (aggregated in api_router)
     app.include_router(api_router)
 
     # --- Custom OpenAPI: add Bearer token auth scheme ---

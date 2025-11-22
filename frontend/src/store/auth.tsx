@@ -1,4 +1,4 @@
-﻿/* C:\coding_projects\dev\schoolflow\frontend\src\store\auth.tsx */
+﻿// C:\coding_projects\dev\schoolflow\frontend\src\store\auth.tsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import api, { setAuthToken } from "../api/client";
 import type { TokenResponse } from "../types/api";
@@ -12,8 +12,35 @@ type AuthContext = {
 
 const AuthCtx = createContext<AuthContext | undefined>(undefined);
 
+/**
+ * Decode a JWT payload (very small helper, no external libs).
+ * Returns the parsed JSON payload or null if decoding fails.
+ */
+function decodeJwtPayload(token: string): any | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payloadBase64 = parts[1];
+
+    // Handle URL-safe base64 and padding
+    const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      Math.ceil(normalized.length / 4) * 4,
+      "=",
+    );
+
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch (err) {
+    console.error("[Auth] Failed to decode JWT payload:", err);
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [token, setTokenState] = useState<string | null>(() => localStorage.getItem("sf_token"));
+  const [token, setTokenState] = useState<string | null>(() =>
+    localStorage.getItem("sf_token"),
+  );
   const [user, setUser] = useState<any | null>(null);
 
   useEffect(() => {
@@ -21,9 +48,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setAuthToken(token);
       localStorage.setItem("sf_token", token);
       console.debug("[Auth] token set (persisted)");
+
+      // 1) Decode token as quick fallback
+      const payload = decodeJwtPayload(token);
+      if (payload) {
+        const id =
+          payload.sub !== undefined && payload.sub !== null
+            ? Number(payload.sub)
+            : undefined;
+        const role = payload.role;
+        setUser({
+          id,
+          role,
+          raw: payload,
+        });
+        console.debug("[Auth] user decoded from token:", { id, role });
+      } else {
+        setUser(null);
+      }
+
+      // 2) Try to load full profile from /auth/me to get canonical user info
+      (async () => {
+        try {
+          const { data } = await api.get("/api/v1/auth/me");
+          // Expecting: { id, email, role, is_active }
+          setUser((prev: any) => ({
+            ...prev,
+            ...data,
+          }));
+          console.debug("[Auth] user loaded from /auth/me:", data);
+        } catch (err) {
+          console.error("[Auth] failed to load /auth/me:", err);
+          // keep fallback from decoded JWT
+        }
+      })();
     } else {
       setAuthToken(undefined);
       localStorage.removeItem("sf_token");
+      setUser(null);
       console.debug("[Auth] token cleared");
     }
   }, [token]);
@@ -44,10 +106,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     console.debug("[Auth.login] payload (form-url-encoded):", bodyString);
 
     try {
-      const { data } = await api.post<TokenResponse>("/api/v1/auth/login", bodyString, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        // ensure cookies if backend uses them; api already sets withCredentials: true
-      });
+      const { data } = await api.post<TokenResponse>(
+        "/api/v1/auth/login",
+        bodyString,
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        },
+      );
 
       console.debug("[Auth.login] response.data:", data);
 
@@ -56,12 +121,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error("Login failed: no token received");
       }
 
+      // Setting the token will trigger the useEffect above, which will decode and call /me.
       setTokenState(data.access_token);
-      // (optional) setUser if backend exposes profile
 
       console.info("[Auth.login] login successful");
     } catch (err: any) {
-      // Log more error detail for debugging
       if (err?.response) {
         console.error("[Auth.login] axios response error:", {
           status: err.response.status,
@@ -71,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         console.error("[Auth.login] error:", err);
       }
-      throw err; // rethrow so UI sees the failure
+      throw err;
     }
   };
 

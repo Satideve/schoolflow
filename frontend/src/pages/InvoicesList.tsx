@@ -1,68 +1,101 @@
-/* C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoicesList.tsx */
+ï»¿// C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoicesList.tsx
 /**
- * Invoices list. Uses the invoices query and displays a simple table.
+ * Invoices list page
  */
 
 import React from "react";
 import { Link } from "react-router-dom";
 import { useInvoices } from "../api/queries";
 import { formatMoney } from "../lib/utils";
-import type { Invoice } from "../types/api";
 
 export default function InvoicesList() {
-  const { data, isLoading, isError } = useInvoices(1);
+  const { data, isLoading, isError } = useInvoices();
 
-  if (isLoading) return <div>Loading invoices…</div>;
-  if (isError) return <div className="text-red-600">Failed to load invoices.</div>;
+  if (isLoading) {
+    return <div>Loading invoices...</div>;
+  }
 
-  const invoices: Invoice[] = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+  if (isError) {
+    return <div className="text-red-600">Failed to load invoices.</div>;
+  }
+
+  const invoices = Array.isArray(data) ? data : (data?.results ?? data ?? []);
 
   if (!invoices || invoices.length === 0) {
     return (
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Invoices</h1>
-          <Link to="/invoices/create" className="bg-green-600 text-white px-3 py-1 rounded">Create Invoice</Link>
-        </div>
-        <div className="bg-white shadow rounded p-6 text-center text-slate-600">No invoices found.</div>
+      <div className="bg-white p-6 rounded shadow text-center">
+        No invoices found.
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Invoices</h1>
-        <Link to="/invoices/create" className="bg-green-600 text-white px-3 py-1 rounded">Create Invoice</Link>
+        <Link
+          to="/invoices/create"
+          className="inline-flex items-center px-3 py-1 rounded border border-slate-300 text-sm text-slate-800 hover:bg-slate-100"
+        >
+          Create Invoice
+        </Link>
       </div>
 
-      <div className="bg-white shadow rounded overflow-x-auto">
-        <table className="w-full table-auto">
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-sm">
           <thead>
-            <tr className="text-left">
-              <th className="p-2">Invoice No</th>
-              <th>Student</th>
-              <th>Period</th>
-              <th className="text-right">Total Due</th>
-              <th className="text-right">Paid</th>
-              <th className="text-right">Balance</th>
-              <th></th>
+            <tr>
+              <th className="p-2 text-left">Invoice No</th>
+              <th className="p-2 text-left">Student</th>
+              <th className="p-2 text-left">Period</th>
+              <th className="p-2 text-right">Total Due</th>
+              <th className="p-2 text-right">Paid</th>
+              <th className="p-2 text-right">Balance</th>
+              <th className="p-2 text-left"></th>
             </tr>
           </thead>
           <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="border-t">
-                <td className="p-2">{inv.invoice_no}</td>
-                <td className="p-2">{(inv as any).student?.name ?? inv.student_id ?? "—"}</td>
-                <td className="p-2">{inv.period ?? "—"}</td>
-                <td className="p-2 text-right">{formatMoney(inv.total_due ?? 0)}</td>
-                <td className="p-2 text-right">{formatMoney(inv.paid_amount ?? 0)}</td>
-                <td className="p-2 text-right font-medium">{formatMoney(inv.balance ?? 0)}</td>
-                <td className="p-2">
-                  <Link to={`/invoices/${inv.id}`} className="text-blue-600">Open</Link>
-                </td>
-              </tr>
-            ))}
+            {invoices.map((inv: any) => {
+              const totalDue =
+                inv.total_due != null
+                  ? Number(inv.total_due)
+                  : Number(inv.amount_due ?? 0);
+
+              const paid = Number(inv.paid_amount ?? 0);
+
+              let balance: number;
+              if (inv.balance != null) {
+                const raw = Number(inv.balance);
+                balance = isNaN(raw) ? totalDue - paid : raw;
+              } else {
+                balance = totalDue - paid;
+              }
+
+              return (
+                <tr key={inv.id} className="border-top">
+                  <td className="p-2">{inv.invoice_no}</td>
+                  <td className="p-2">{inv.student_id}</td>
+                  <td className="p-2">{inv.period}</td>
+                  <td className="p-2 text-right">
+                    {formatMoney(isNaN(totalDue) ? 0 : totalDue)}
+                  </td>
+                  <td className="p-2 text-right">
+                    {formatMoney(isNaN(paid) ? 0 : paid)}
+                  </td>
+                  <td className="p-2 text-right">
+                    {formatMoney(isNaN(balance) ? 0 : balance)}
+                  </td>
+                  <td className="p-2 text-right">
+                    <Link
+                      to={`/invoices/${inv.id}`}
+                      className="text-blue-600"
+                    >
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

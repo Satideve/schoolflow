@@ -1,10 +1,16 @@
-/* C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx */
+﻿/* C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx */
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../store/auth";
 
 export default function Navbar() {
   const auth = useAuth();
+
+  const roleLabel = auth.user?.role
+    ? auth.user.role.charAt(0).toUpperCase() + auth.user.role.slice(1)
+    : "User";
+
+  const idLabel = auth.user?.id ? `#${auth.user.id}` : "";
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow">
@@ -40,11 +46,12 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Right side: auth controls + admin label */}
+          {/* Right side: auth controls + dynamic user label */}
           <div className="flex items-center gap-3">
             <div className="text-sm text-slate-600 dark:text-slate-300">
-              Admin
+              {roleLabel} {idLabel}
             </div>
+
             {auth.token ? (
               <button
                 onClick={() => auth.logout()}
