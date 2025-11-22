@@ -11,6 +11,26 @@ import InvoicesList from "./pages/InvoicesList";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import CreateInvoice from "./pages/CreateInvoice";
 import ReceiptsList from "./pages/ReceiptsList";
+import MyInvoices from "./pages/MyInvoices";
+import MyReceipts from "./pages/MyReceipts";
+import { useAuth } from "./store/auth";
+
+/**
+ * AdminRoute: restrict children to admin-like roles only.
+ * Admin-like: admin, clerk, accountant.
+ */
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const role: string | undefined = user?.role;
+  const isAdminLike =
+    role === "admin" || role === "clerk" || role === "accountant";
+
+  if (!isAdminLike) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
 
 export default function App() {
   return (
@@ -29,12 +49,15 @@ export default function App() {
         }
       />
 
+      {/* Admin-only invoice/receipt management */}
       <Route
         path="/invoices"
         element={
           <RouteGuard>
             <Shell>
-              <InvoicesList />
+              <AdminRoute>
+                <InvoicesList />
+              </AdminRoute>
             </Shell>
           </RouteGuard>
         }
@@ -45,7 +68,9 @@ export default function App() {
         element={
           <RouteGuard>
             <Shell>
-              <CreateInvoice />
+              <AdminRoute>
+                <CreateInvoice />
+              </AdminRoute>
             </Shell>
           </RouteGuard>
         }
@@ -56,7 +81,9 @@ export default function App() {
         element={
           <RouteGuard>
             <Shell>
-              <InvoiceDetail />
+              <AdminRoute>
+                <InvoiceDetail />
+              </AdminRoute>
             </Shell>
           </RouteGuard>
         }
@@ -67,7 +94,32 @@ export default function App() {
         element={
           <RouteGuard>
             <Shell>
-              <ReceiptsList />
+              <AdminRoute>
+                <ReceiptsList />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Student/parent pages */}
+      <Route
+        path="/my/invoices"
+        element={
+          <RouteGuard>
+            <Shell>
+              <MyInvoices />
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      <Route
+        path="/my/receipts"
+        element={
+          <RouteGuard>
+            <Shell>
+              <MyReceipts />
             </Shell>
           </RouteGuard>
         }

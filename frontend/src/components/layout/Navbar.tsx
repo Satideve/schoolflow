@@ -6,8 +6,12 @@ import { useAuth } from "../../store/auth";
 export default function Navbar() {
   const auth = useAuth();
 
-  const roleLabel = auth.user?.role
-    ? auth.user.role.charAt(0).toUpperCase() + auth.user.role.slice(1)
+  const role: string | undefined = auth.user?.role;
+  const isAdminLike =
+    role === "admin" || role === "clerk" || role === "accountant";
+
+  const roleLabel = role
+    ? role.charAt(0).toUpperCase() + role.slice(1)
     : "User";
 
   const idLabel = auth.user?.id ? `#${auth.user.id}` : "";
@@ -25,18 +29,37 @@ export default function Navbar() {
               SchoolFlow
             </Link>
             <nav className="hidden sm:flex gap-3">
-              <Link
-                to="/invoices"
-                className="text-sm text-slate-600 dark:text-slate-300"
-              >
-                Invoices
-              </Link>
-              <Link
-                to="/receipts"
-                className="text-sm text-slate-600 dark:text-slate-300"
-              >
-                Receipts
-              </Link>
+              {isAdminLike ? (
+                <>
+                  <Link
+                    to="/invoices"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Invoices
+                  </Link>
+                  <Link
+                    to="/receipts"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Receipts
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/my/invoices"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    My Invoices
+                  </Link>
+                  <Link
+                    to="/my/receipts"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    My Receipts
+                  </Link>
+                </>
+              )}
               <Link
                 to="/about"
                 className="text-sm text-slate-600 dark:text-slate-300"
