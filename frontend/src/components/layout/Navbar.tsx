@@ -1,4 +1,4 @@
-﻿/* C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx */
+/* C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx */
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../store/auth";
@@ -28,7 +28,7 @@ export default function Navbar() {
             >
               SchoolFlow
             </Link>
-            <nav className="hidden sm:flex gap-3">
+            <nav className="flex gap-3">
               {isAdminLike ? (
                 <>
                   <Link
@@ -42,6 +42,12 @@ export default function Navbar() {
                     className="text-sm text-slate-600 dark:text-slate-300"
                   >
                     Receipts
+                  </Link>
+                  <Link
+                    to="/fee-assignments"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Fee Assignments
                   </Link>
                 </>
               ) : (

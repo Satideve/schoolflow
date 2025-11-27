@@ -21,6 +21,38 @@ router = APIRouter(
     tags=["fees", "receipts"],
 )
 
+
+def _build_receipt_out(db: Session, receipt: Receipt) -> ReceiptOut:
+    """
+    Build ReceiptOut including derived invoice_id and amount from Payment.
+    """
+    payment = (
+        db.query(Payment)
+        .filter(Payment.id == receipt.payment_id)
+        .first()
+    )
+
+    invoice_id = None
+    amount = None
+    if payment is not None:
+        # fee_invoice_id is our canonical FK; invoice_id kept for compatibility
+        invoice_id = getattr(payment, "fee_invoice_id", None) or getattr(
+            payment, "invoice_id", None
+        )
+        amount = payment.amount
+
+    return ReceiptOut(
+        id=receipt.id,
+        payment_id=receipt.payment_id,
+        receipt_no=receipt.receipt_no,
+        pdf_path=receipt.pdf_path,
+        created_at=receipt.created_at,
+        created_by=receipt.created_by,
+        invoice_id=invoice_id,
+        amount=amount,
+    )
+
+
 # RBAC helper:
 # - Admin/Clerk: full access
 # - Student/Parent: only if receipt belongs to their own student_id (via invoice linkage)
@@ -45,11 +77,17 @@ def _enforce_role_or_ownership(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "not_found", "message": "Payment not found"},
             )
-        invoice = db.query(Invoice).filter(Invoice.id == getattr(payment, "fee_invoice_id", None) or getattr(payment, "invoice_id", None)).first()
+        invoice = db.query(Invoice).filter(
+            Invoice.id == getattr(payment, "fee_invoice_id", None)
+            or getattr(payment, "invoice_id", None)
+        ).first()
         if not invoice or invoice.student_id != getattr(current_user, "student_id", None):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail={"code": "forbidden", "message": "Not authorized to access this receipt"},
+                detail={
+                    "code": "forbidden",
+                    "message": "Not authorized to access this receipt",
+                },
             )
         return
 
@@ -75,7 +113,10 @@ def create_receipt(
     if getattr(current_user, "role", None) not in {"admin", "clerk"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Only admin/clerk can create receipts"},
+            detail={
+                "code": "forbidden",
+                "message": "Only admin/clerk can create receipts",
+            },
         )
 
     service = ReceiptService(db)
@@ -83,10 +124,10 @@ def create_receipt(
     # Idempotency: return existing receipt if already present
     existing = service.get_by_payment_id(payload.payment_id)
     if existing:
-        return existing
+        return _build_receipt_out(db, existing)
 
     try:
-        # Service handles payment→invoice→student validation + rendering
+        # Service handles payment?invoice?student validation + rendering
         receipt = service.create_receipt_and_render(
             payment_id=payload.payment_id,
             receipt_no=payload.receipt_no,
@@ -96,7 +137,10 @@ def create_receipt(
         # Conflict: duplicate receipt_no
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "conflict", "message": "Receipt number already in use."},
+            detail={
+                "code": "conflict",
+                "message": "Receipt number already in use.",
+            },
         )
     except Exception as exc:
         # Validation/other errors: standardized shape
@@ -105,7 +149,7 @@ def create_receipt(
             detail={"code": "validation_error", "message": str(exc)},
         )
 
-    return receipt
+    return _build_receipt_out(db, receipt)
 
 
 @router.get("/", response_model=List[ReceiptOut], status_code=status.HTTP_200_OK)
@@ -137,7 +181,7 @@ def list_receipts(
             detail={"code": "forbidden", "message": "Not authorized"},
         )
 
-    return [ReceiptOut.from_orm(r) for r in receipts]
+    return [_build_receipt_out(db, r) for r in receipts]
 
 
 @router.get("/metadata", response_model=List[ReceiptOut], status_code=status.HTTP_200_OK)
@@ -172,7 +216,7 @@ def list_receipts_metadata(
             detail={"code": "forbidden", "message": "Not authorized"},
         )
 
-    return [ReceiptOut.from_orm(r) for r in receipts]
+    return [_build_receipt_out(db, r) for r in receipts]
 
 
 @router.get("/{receipt_id}/metadata", response_model=ReceiptOut, status_code=status.HTTP_200_OK)
@@ -194,7 +238,7 @@ def get_receipt_metadata(
 
     # Enforce RBAC/ownership
     _enforce_role_or_ownership(db, current_user, receipt)
-    return ReceiptOut.from_orm(receipt)
+    return _build_receipt_out(db, receipt)
 
 
 @router.get("/{receipt_id}", response_model=ReceiptOut, status_code=status.HTTP_200_OK)
@@ -216,7 +260,7 @@ def get_receipt(
 
     # Enforce RBAC/ownership
     _enforce_role_or_ownership(db, current_user, receipt)
-    return ReceiptOut.from_orm(receipt)
+    return _build_receipt_out(db, receipt)
 
 
 @router.get("/{receipt_id}/download", response_class=FileResponse)
@@ -262,7 +306,10 @@ def download_receipt_pdf(
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "not_found", "message": f"Invalid receipt path: {file_path}"},
+            detail={
+                "code": "not_found",
+                "message": f"Invalid receipt path: {file_path}",
+            },
         )
 
     # Check that resolved path is inside one of allowed roots
@@ -279,13 +326,19 @@ def download_receipt_pdf(
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "forbidden", "message": "Access outside receipts directory is forbidden"},
+            detail={
+                "code": "forbidden",
+                "message": "Access outside receipts directory is forbidden",
+            },
         )
 
     if not fp.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "not_found", "message": f"PDF file missing on server: {file_path}"},
+            detail={
+                "code": "not_found",
+                "message": f"PDF file missing on server: {file_path}",
+            },
         )
 
     filename = os.path.basename(str(fp))

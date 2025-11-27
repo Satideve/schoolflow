@@ -1,4 +1,4 @@
-﻿/* C:\coding_projects\dev\schoolflow\frontend\src\App.tsx */
+/* C:\coding_projects\dev\schoolflow\frontend\src\App.tsx */
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Shell from "./components/layout/Shell";
@@ -13,6 +13,8 @@ import CreateInvoice from "./pages/CreateInvoice";
 import ReceiptsList from "./pages/ReceiptsList";
 import MyInvoices from "./pages/MyInvoices";
 import MyReceipts from "./pages/MyReceipts";
+import FeeAssignments from "./pages/FeeAssignments";
+import NotFound from "./pages/NotFound";
 import { useAuth } from "./store/auth";
 
 /**
@@ -102,6 +104,19 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/fee-assignments"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <FeeAssignments />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
       {/* Student/parent pages */}
       <Route
         path="/my/invoices"
@@ -136,8 +151,18 @@ export default function App() {
         }
       />
 
-      <Route path="/404" element={<div className="p-8">Not found</div>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* 404 */}
+      <Route
+        path="/404"
+        element={
+          <RouteGuard>
+            <Shell>
+              <NotFound />
+            </Shell>
+          </RouteGuard>
+        }
+      />
+      <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   );
 }

@@ -1,15 +1,19 @@
-﻿// C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoicesList.tsx
+// C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoicesList.tsx
 /**
  * Invoices list page
  */
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useInvoices } from "../api/queries";
+import { useInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
+
+type StatusFilter = "all" | "pending" | "paid";
 
 export default function InvoicesList() {
   const { data, isLoading, isError } = useInvoices();
+  const { data: students } = useStudents();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   if (isLoading) {
     return <div>Loading invoices...</div>;
@@ -19,7 +23,34 @@ export default function InvoicesList() {
     return <div className="text-red-600">Failed to load invoices.</div>;
   }
 
-  const invoices = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+  const invoicesRaw = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+
+  const studentNameById = new Map<number, string>();
+  students?.forEach((s: any) => {
+    if (s && typeof s.id === "number") {
+      const label = s.name ?? `Student #${s.id}`;
+      studentNameById.set(s.id, label);
+    }
+  });
+
+  const invoices = useMemo(() => {
+    if (!invoicesRaw) return [];
+
+    return (invoicesRaw as any[]).filter((inv) => {
+      const totalDue =
+        inv.total_due != null ? Number(inv.total_due) : Number(inv.amount_due ?? 0);
+      const paid = Number(inv.paid_amount ?? 0);
+      const balance =
+        inv.balance != null && !Number.isNaN(Number(inv.balance))
+          ? Number(inv.balance)
+          : totalDue - paid;
+
+      if (statusFilter === "all") return true;
+      if (statusFilter === "pending") return balance > 0.01;
+      if (statusFilter === "paid") return balance <= 0.01;
+      return true;
+    });
+  }, [invoicesRaw, statusFilter]);
 
   if (!invoices || invoices.length === 0) {
     return (
@@ -31,14 +62,27 @@ export default function InvoicesList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h1 className="text-2xl font-bold">Invoices</h1>
-        <Link
-          to="/invoices/create"
-          className="inline-flex items-center px-3 py-1 rounded border border-slate-300 text-sm text-slate-800 hover:bg-slate-100"
-        >
-          Create Invoice
-        </Link>
+
+        <div className="flex flex-wrap gap-2 items-center">
+          <select
+            className="border rounded px-2 py-1 text-sm"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          >
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+          </select>
+
+          <Link
+            to="/invoices/create"
+            className="inline-flex items-center px-3 py-1 rounded border border-slate-300 text-sm text-slate-800 hover:bg-slate-100"
+          >
+            Create Invoice
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white rounded shadow overflow-x-auto">
@@ -71,10 +115,14 @@ export default function InvoicesList() {
                 balance = totalDue - paid;
               }
 
+              const studentName =
+                studentNameById.get(inv.student_id) ??
+                `Student #${inv.student_id}`;
+
               return (
-                <tr key={inv.id} className="border-top">
+                <tr key={inv.id} className="border-t">
                   <td className="p-2">{inv.invoice_no}</td>
-                  <td className="p-2">{inv.student_id}</td>
+                  <td className="p-2">{studentName}</td>
                   <td className="p-2">{inv.period}</td>
                   <td className="p-2 text-right">
                     {formatMoney(isNaN(totalDue) ? 0 : totalDue)}

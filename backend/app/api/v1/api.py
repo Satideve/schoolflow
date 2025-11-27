@@ -8,6 +8,7 @@ from app.api.v1.routers.fees.receipts import router as receipts_router
 from app.api.v1.routers.users import router as users_router
 from app.api.v1.routers.fees.fee_components import router as fee_components_router
 from app.api.v1.routers.auth_me import router as auth_me_router
+from app.api.v1.routers.fees.assignments import router as fee_assignments_router
 
 api_router = APIRouter()
 
@@ -25,6 +26,7 @@ api_router.include_router(invoices.router)
 api_router.include_router(payments.router)
 api_router.include_router(receipts_router)
 api_router.include_router(fee_components_router)
+api_router.include_router(fee_assignments_router)
 
 # User management
 api_router.include_router(users_router)

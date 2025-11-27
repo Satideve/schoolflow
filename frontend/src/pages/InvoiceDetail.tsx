@@ -1,12 +1,12 @@
-﻿/* C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoiceDetail.tsx */
+/* C:\coding_projects\dev\schoolflow\frontend\src\pages\InvoiceDetail.tsx */
 /**
- * Invoice detail page — uses app toast for success/error and shows latest receipt summary.
+ * Invoice detail page � uses app toast for success/error and shows latest receipt summary.
  */
 
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useInvoice } from "../api/queries";
+import { useInvoice, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 import { createPaymentOrder, CreatePaymentPayload } from "../api/payments";
 import PaymentDialog from "../components/PaymentDialog";
@@ -16,6 +16,7 @@ export default function InvoiceDetail() {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useInvoice(id);
+  const { data: students } = useStudents();
   const { toast } = useToast();
 
   const [openPayment, setOpenPayment] = useState(false);
@@ -23,31 +24,24 @@ export default function InvoiceDetail() {
   const paymentMutation = useMutation({
     mutationFn: (payload: CreatePaymentPayload) =>
       createPaymentOrder(id as string, payload),
-    onSuccess: async (data) => {
+    onSuccess: async () => {
       try {
-        // refetch invoice and receipts (wait)
         await queryClient.refetchQueries({ queryKey: ["invoice", id], exact: true });
         await queryClient.refetchQueries({ queryKey: ["receipts"], exact: false });
         setOpenPayment(false);
-
-        toast({
-          title: "Payment recorded",
-          description: "Invoice and receipts refreshed.",
-        });
-      } catch (e) {
-        console.error("Refetch after payment failed", e);
+        toast({ title: "Payment recorded", description: "Invoice and receipts refreshed." });
+      } catch {
         toast({
           title: "Payment recorded (partial)",
-          description: "Payment created but failed to refresh data. Check receipts page.",
+          description: "Payment created but failed to refresh data.",
           variant: "destructive",
         });
       }
     },
-    onError: (err: any) => {
-      console.error("Payment creation failed", err);
+    onError: () => {
       toast({
         title: "Payment failed",
-        description: "Failed to create payment. See console for details.",
+        description: "Failed to create payment.",
         variant: "destructive",
       });
     },
@@ -59,14 +53,25 @@ export default function InvoiceDetail() {
 
   const inv: any = data;
 
+  // Student label
+  const studentNameById = new Map<number, string>();
+  students?.forEach((s: any) => {
+    if (s && typeof s.id === "number") {
+      studentNameById.set(s.id, s.name ?? `Student #${s.id}`);
+    }
+  });
+  const studentLabel =
+    studentNameById.get(inv.student_id) ?? inv.student?.name ?? `Student #${inv.student_id}`;
+
+  // Line items
   const items =
-    Array.isArray(inv.items) && inv.items.length > 0
+    inv.items && inv.items.length > 0
       ? inv.items
-      : Array.isArray(inv.line_items) && inv.line_items.length > 0
+      : inv.line_items && inv.line_items.length > 0
       ? inv.line_items
-      : Array.isArray(inv.components) && inv.components.length > 0
+      : inv.components && inv.components.length > 0
       ? inv.components
-      : Array.isArray(inv.fee_components) && inv.fee_components.length > 0
+      : inv.fee_components && inv.fee_components.length > 0
       ? inv.fee_components
       : [];
 
@@ -91,24 +96,22 @@ export default function InvoiceDetail() {
     });
   }
 
-  // debug click helper (kept for troubleshooting)
-  function onCollectClick() {
-    console.log("Collect Payment button clicked — attempting to open dialog. openPayment before:", openPayment);
-    setOpenPayment(true);
-    setTimeout(() => console.log("openPayment state after setTimeout:", openPayment), 50);
-  }
-
-  // Latest receipt (most recent by created_at)
-  const latestReceipt = Array.isArray(inv.receipts) && inv.receipts.length > 0
-    ? [...inv.receipts].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-    : null;
+  // Latest receipt
+  const latestReceipt =
+    Array.isArray(inv.receipts) && inv.receipts.length > 0
+      ? [...inv.receipts].sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
+      : null;
 
   return (
     <div className="max-w-3xl mx-auto pt-20">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h1 className="text-2xl font-bold">Invoice {inv.invoice_no ?? "-"}</h1>
-          <p className="text-sm text-gray-600">Invoice ID: {inv.id} · Period: {inv.period ?? "-"}</p>
+          <p className="text-sm text-gray-600">Invoice ID: {inv.id} � Period: {inv.period ?? "-"}</p>
+          <p className="text-sm text-gray-600">Student: {studentLabel}</p>
           <p className="text-sm text-gray-600">Due: {inv.due_date ?? "-"}</p>
         </div>
 
@@ -122,9 +125,8 @@ export default function InvoiceDetail() {
             Download PDF
           </a>
           <button
-            id="collect-payment-btn"
             className="px-3 py-1 rounded bg-blue-600 text-white"
-            onClick={onCollectClick}
+            onClick={() => setOpenPayment(true)}
           >
             Collect Payment
           </button>
@@ -138,14 +140,13 @@ export default function InvoiceDetail() {
             <thead>
               <tr className="text-left">
                 <th className="p-2">Title</th>
-                <th className="p-2">Qty</th>
                 <th className="p-2 text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="p-2 text-sm text-slate-500">
+                  <td colSpan={2} className="p-2 text-sm text-slate-500">
                     No items
                   </td>
                 </tr>
@@ -153,8 +154,9 @@ export default function InvoiceDetail() {
                 items.map((it: any, idx: number) => (
                   <tr key={idx} className="border-t">
                     <td className="p-2 align-top">{itemTitle(it)}</td>
-                    <td className="p-2 align-top">{it.quantity ?? "-"}</td>
-                    <td className="p-2 text-right align-top">{formatMoney(it.amount ?? it.price ?? 0)}</td>
+                    <td className="p-2 text-right align-top">
+                      {formatMoney(it.amount ?? it.price ?? 0)}
+                    </td>
                   </tr>
                 ))
               )}
@@ -163,10 +165,24 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="mt-4 text-right space-y-1">
-          <div>Items total: {formatMoney(inv.items_total ?? inv.items_total_amount ?? 0)}</div>
+          <div>Items total: {formatMoney(inv.items_total ?? 0)}</div>
           <div>Total due: {formatMoney(inv.total_due ?? inv.amount_due ?? 0)}</div>
-          <div>Paid: {formatMoney(inv.paid_amount ?? inv.paid ?? (Array.isArray(inv.receipts) ? inv.receipts.reduce((s:any,r:any)=>s+(r.amount??0),0):0))}</div>
-          <div className="font-bold">Balance: {formatMoney(inv.balance ?? inv.amount_due ?? 0 - (inv.paid_amount ?? inv.paid ?? 0))}</div>
+          <div>
+            Paid:{" "}
+            {formatMoney(
+              inv.paid_amount ??
+                inv.paid ??
+                (Array.isArray(inv.receipts)
+                  ? inv.receipts.reduce((s: any, r: any) => s + (r.amount ?? 0), 0)
+                  : 0)
+            )}
+          </div>
+          <div className="font-bold">
+            Balance:{" "}
+            {formatMoney(
+              inv.balance ?? (inv.amount_due ?? 0) - (inv.paid_amount ?? inv.paid ?? 0)
+            )}
+          </div>
         </div>
 
         {latestReceipt && (
@@ -174,7 +190,9 @@ export default function InvoiceDetail() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-slate-600">Latest receipt</div>
-                <div className="font-medium">{latestReceipt.receipt_no ?? latestReceipt.id}</div>
+                <div className="font-medium">
+                  {latestReceipt.receipt_no ?? latestReceipt.id}
+                </div>
                 <div className="text-sm">{formatMoney(latestReceipt.amount ?? 0)}</div>
               </div>
               <div>
@@ -190,7 +208,6 @@ export default function InvoiceDetail() {
             </div>
           </div>
         )}
-
       </div>
 
       <PaymentDialog

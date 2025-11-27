@@ -1,4 +1,4 @@
-﻿// C:\coding_projects\dev\schoolflow\frontend\src\pages\ReceiptsList.tsx
+// C:\coding_projects\dev\schoolflow\frontend\src\pages\ReceiptsList.tsx
 /**
  * Receipts list page
  */
@@ -38,7 +38,8 @@ export default function ReceiptsList() {
             <tr>
               <th className="p-2 text-left">ID</th>
               <th className="p-2 text-left">Receipt No</th>
-              <th className="p-2 text-left">Payment ID</th>
+              <th className="p-2 text-left">Invoice ID</th>
+              <th className="p-2 text-left">Amount</th>
               <th className="p-2 text-left">Created At</th>
               <th className="p-2 text-left">Actions</th>
             </tr>
@@ -48,7 +49,8 @@ export default function ReceiptsList() {
               <tr key={r.id} className="border-t">
                 <td className="p-2">{r.id}</td>
                 <td className="p-2">{r.receipt_no ?? "-"}</td>
-                <td className="p-2">{r.payment_id ?? "-"}</td>
+                <td className="p-2">{r.invoice_id ?? "-"}</td>
+                <td className="p-2">{r.amount ?? "-"}</td>
                 <td className="p-2">{r.created_at ?? "-"}</td>
                 <td className="p-2">
                   <a
