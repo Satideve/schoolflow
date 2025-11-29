@@ -1,0 +1,5 @@
+id,name,standard,section,capacity,academic_year
+1,IX-A,IX,A,40,2025-2026
+2,X-B,X,B,45,2025-2026
+3,X-B,IX,B,55,2025-2026
+4,X-B,XI,B,65,2025-2026

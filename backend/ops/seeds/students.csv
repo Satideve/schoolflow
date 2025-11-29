@@ -1,0 +1,5 @@
+id,name,roll_number,class_section_id,parent_email
+1,Anjali Singh,1A-001,1,parent1@example.com
+2,Rahul Sharma,1A-002,1,parent2@example.com
+3,Ashok Sharma,1A-003,1,parent2@example.com
+4,Prawal Narayan,1A-004,1,parent2@example.com

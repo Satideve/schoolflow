@@ -1,0 +1,4 @@
+fee_plan_name,academic_year,frequency,component_name,amount,is_mandatory
+Standard-IX-2025,2025,monthly,Tuition,2200.00,TRUE
+Standard-IX-2025,2025,monthly,Transport,700.00,FALSE
+Standard-IX-2025,2025,monthly,Lab Fee,150.00,TRUE

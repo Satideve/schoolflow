@@ -1,0 +1,2 @@
+id,payment_id,receipt_no,pdf_path
+1,1,REC-TEST-0001,app/data/receipts/REC-TEST-0001.pdf

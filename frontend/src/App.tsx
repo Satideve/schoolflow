@@ -14,6 +14,11 @@ import ReceiptsList from "./pages/ReceiptsList";
 import MyInvoices from "./pages/MyInvoices";
 import MyReceipts from "./pages/MyReceipts";
 import FeeAssignments from "./pages/FeeAssignments";
+import CsvImport from "./pages/CsvImport";
+import ClassSections from "./pages/ClassSections";
+import Students from "./pages/Students";
+import FeeComponents from "./pages/FeeComponents";
+import FeePlans from "./pages/FeePlans";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./store/auth";
 
@@ -37,9 +42,10 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
+      {/* Public login */}
       <Route path="/login" element={<Login />} />
 
-      {/* Protected section wrapped with Shell + RouteGuard */}
+      {/* Dashboard (any authenticated user) */}
       <Route
         path="/"
         element={
@@ -104,6 +110,7 @@ export default function App() {
         }
       />
 
+      {/* Admin-only: Fee Assignments */}
       <Route
         path="/fee-assignments"
         element={
@@ -111,6 +118,76 @@ export default function App() {
             <Shell>
               <AdminRoute>
                 <FeeAssignments />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: CSV Import */}
+      <Route
+        path="/admin/csv"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <CsvImport />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: Class Sections CRUD */}
+      <Route
+        path="/class-sections"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <ClassSections />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: Students CRUD */}
+      <Route
+        path="/students"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <Students />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: Fee Components CRUD */}
+      <Route
+        path="/fee-components"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <FeeComponents />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: Fee Plans CRUD */}
+      <Route
+        path="/fee-plans"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <FeePlans />
               </AdminRoute>
             </Shell>
           </RouteGuard>
@@ -140,6 +217,7 @@ export default function App() {
         }
       />
 
+      {/* About for any authenticated user */}
       <Route
         path="/about"
         element={
@@ -151,15 +229,13 @@ export default function App() {
         }
       />
 
-      {/* 404 */}
+      {/* Not found */}
       <Route
         path="/404"
         element={
-          <RouteGuard>
-            <Shell>
-              <NotFound />
-            </Shell>
-          </RouteGuard>
+          <Shell>
+            <NotFound />
+          </Shell>
         }
       />
       <Route path="*" element={<Navigate to="/404" replace />} />

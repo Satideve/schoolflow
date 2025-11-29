@@ -1,0 +1,2 @@
+id,fee_invoice_id,provider,provider_txn_id,amount,status,idempotency_key
+1,1,fake,FAKE-TXN-0001,5000.00,captured,IDEMP-0001

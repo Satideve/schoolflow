@@ -14,14 +14,33 @@ export type User = {
   id: number;
   email: string;
   full_name?: string | null;
-  role?: "admin" | "clerk" | string;
+  role?: "admin" | "clerk" | "student" | string;
+};
+
+export type ClassSection = {
+  id: number;
+  name: string;
+  academic_year: string;
 };
 
 export type Student = {
   id: number;
   name?: string;
-  admission_no?: string;
+  roll_number?: string;
   class_section_id?: number;
+};
+
+export type FeeComponent = {
+  id: number;
+  name: string;
+  description?: string | null;
+};
+
+export type FeePlan = {
+  id: number;
+  name: string;
+  academic_year: string;
+  frequency: string;
 };
 
 export type InvoiceItem = {
@@ -59,36 +78,4 @@ export type Receipt = {
   invoice_id: number;
   amount: number;
   created_at?: string | null;
-};
-
-/* -----------------------------
-   Fee Plans
------------------------------- */
-
-export type FeePlan = {
-  id: number;
-  name: string;
-  academic_year: string;
-  frequency: string;
-};
-
-/* -----------------------------
-   Fee Assignments
------------------------------- */
-
-export type FeeAssignment = {
-  id: number;
-  student_id: number;
-  fee_plan_id: number;
-  invoice_id?: number | null;
-  concession: string; // backend returns Decimal as string, e.g. "0.00"
-  note?: string | null;
-};
-
-export type FeeAssignmentCreateDTO = {
-  student_id: number;
-  fee_plan_id: number;
-  invoice_id?: number | null;
-  concession?: number | null;
-  note?: string | null;
 };

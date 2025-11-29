@@ -18,7 +18,7 @@ export default function Navbar() {
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx_auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between">
           {/* Left side: brand + nav links */}
           <div className="flex items-center gap-4">
@@ -28,7 +28,8 @@ export default function Navbar() {
             >
               SchoolFlow
             </Link>
-            <nav className="flex gap-3">
+            {/* Always show nav links (no hidden sm:flex) */}
+            <nav className="flex gap-3 flex-wrap">
               {isAdminLike ? (
                 <>
                   <Link
@@ -48,6 +49,36 @@ export default function Navbar() {
                     className="text-sm text-slate-600 dark:text-slate-300"
                   >
                     Fee Assignments
+                  </Link>
+                  <Link
+                    to="/class-sections"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Class Sections
+                  </Link>
+                  <Link
+                    to="/students"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Students
+                  </Link>
+                  <Link
+                    to="/fee-components"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Fee Components
+                  </Link>
+                  <Link
+                    to="/fee-plans"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    Fee Plans
+                  </Link>
+                  <Link
+                    to="/admin/csv"
+                    className="text-sm text-slate-600 dark:text-slate-300"
+                  >
+                    CSV Import
                   </Link>
                 </>
               ) : (
