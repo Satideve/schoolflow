@@ -19,6 +19,7 @@ import ClassSections from "./pages/ClassSections";
 import Students from "./pages/Students";
 import FeeComponents from "./pages/FeeComponents";
 import FeePlans from "./pages/FeePlans";
+import FeePlanDetail from "./pages/FeePlanDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./store/auth";
 
@@ -188,6 +189,20 @@ export default function App() {
             <Shell>
               <AdminRoute>
                 <FeePlans />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
+      {/* Admin-only: Fee Plan Detail */}
+      <Route
+        path="/fee-plans/:id"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <FeePlanDetail />
               </AdminRoute>
             </Shell>
           </RouteGuard>

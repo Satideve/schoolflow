@@ -43,6 +43,19 @@ export type FeePlan = {
   frequency: string;
 };
 
+/**
+ * One line item (component) within a fee plan.
+ * This matches the fee_plan_component backend schema.
+ */
+export type FeePlanComponent = {
+  id: number;
+  fee_plan_id: number;
+  fee_component_id: number;
+  amount: number;
+  // Often the backend will return the linked component for convenience.
+  fee_component?: FeeComponent | null;
+};
+
 export type InvoiceItem = {
   title: string;
   description?: string | null;

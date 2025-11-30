@@ -1,6 +1,7 @@
 /* C:\coding_projects\dev\schoolflow\frontend\src\pages\FeePlans.tsx */
 import React from "react";
 import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
 import { useFeePlans, useCreateFeePlan } from "../api/queries";
 import { useToast } from "../components/ui/use-toast";
 
@@ -106,7 +107,14 @@ export default function FeePlans() {
                 {plans.map((p: any) => (
                   <tr key={p.id} className="border-t">
                     <td className="p-2">{p.id}</td>
-                    <td className="p-2">{p.name}</td>
+                    <td className="p-2">
+                      <Link
+                        to={`/fee-plans/${p.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {p.name}
+                      </Link>
+                    </td>
                     <td className="p-2">{p.academic_year}</td>
                     <td className="p-2">{p.frequency}</td>
                   </tr>

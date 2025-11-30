@@ -10,6 +10,7 @@ import {
   Student,
   FeeComponent,
   FeePlan,
+  FeePlanComponent,
 } from "../types/api";
 
 /* ------------------------------------------------------
@@ -130,6 +131,100 @@ export function useCreateFeePlan() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["fee-plans"] });
+    },
+  });
+}
+
+/**
+ * Get a single fee plan by ID
+ */
+export function useFeePlan(id?: number | string) {
+  return useQuery({
+    queryKey: ["fee-plan", id],
+    queryFn: async (): Promise<FeePlan> => {
+      const { data } = await api.get(`/api/v1/fee-plans/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+/* ------------------------------------------------------
+   FEE PLAN COMPONENTS
+------------------------------------------------------- */
+/**
+ * Fetch all fee plan components, and (optionally) filter by fee_plan_id.
+ */
+export function useFeePlanComponents(feePlanId?: number | string) {
+  return useQuery({
+    queryKey: ["fee-plan-components"],
+    queryFn: async (): Promise<FeePlanComponent[]> => {
+      const { data } = await api.get("/api/v1/fee-plan-components/");
+      return data;
+    },
+    select: (components): FeePlanComponent[] => {
+      if (!feePlanId) return components;
+      const idStr = String(feePlanId);
+      return components.filter((c) => String(c.fee_plan_id) === idStr);
+    },
+  });
+}
+
+/**
+ * Create a new fee plan component (line item) for a plan.
+ */
+export function useCreateFeePlanComponent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      fee_plan_id: number;
+      fee_component_id: number;
+      amount: number;
+    }): Promise<FeePlanComponent> => {
+      const { data } = await api.post("/api/v1/fee-plan-components/", payload);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-plan-components"] });
+    },
+  });
+}
+
+/**
+ * Update an existing fee plan component.
+ */
+export function useUpdateFeePlanComponent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      fee_component_id?: number;
+      amount?: number;
+    }): Promise<FeePlanComponent> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/fee-plan-components/${id}`, body);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-plan-components"] });
+    },
+  });
+}
+
+/**
+ * Delete a fee plan component.
+ */
+export function useDeleteFeePlanComponent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/fee-plan-components/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-plan-components"] });
     },
   });
 }
