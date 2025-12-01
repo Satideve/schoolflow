@@ -1,5 +1,5 @@
 // C:\coding_projects\dev\schoolflow\frontend\src\pages\MyInvoices.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import { useMyInvoices, useStudents } from "../api/queries";
@@ -17,10 +17,40 @@ const MyInvoices: React.FC = () => {
     ? studentsData
     : (studentsData ?? []);
 
+  const studentById = useMemo(() => {
+    const map = new Map<number, any>();
+    students.forEach((s: any) => {
+      if (s && typeof s.id === "number") {
+        map.set(s.id, s);
+      }
+    });
+    return map;
+  }, [students]);
+
   const findStudentName = (studentId: number) => {
-    const match = students.find((s: any) => s.id === studentId);
+    const match = studentById.get(studentId);
     return match?.name ?? `Student #${studentId}`;
   };
+
+  const invoicesExist = invoices && invoices.length > 0;
+
+  // For context, prefer the mapping from the logged-in user to a student
+  const studentIdFromUser =
+    user && typeof (user as any).student_id === "number"
+      ? (user as any).student_id
+      : undefined;
+
+  const studentIdFromInvoices =
+    invoicesExist && typeof invoices[0]?.student_id === "number"
+      ? invoices[0].student_id
+      : undefined;
+
+  const studentIdForContext = studentIdFromUser ?? studentIdFromInvoices;
+
+  const primaryStudentName =
+    typeof studentIdForContext === "number"
+      ? findStudentName(studentIdForContext)
+      : undefined;
 
   if (isLoading) {
     return <div>Loading my invoices...</div>;
@@ -34,10 +64,14 @@ const MyInvoices: React.FC = () => {
     );
   }
 
-  if (!invoices || invoices.length === 0) {
+  if (!invoicesExist) {
     return (
       <div className="bg-white p-6 rounded shadow space-y-3">
-        <h1 className="text-2xl font-bold">My Invoices</h1>
+        <h1 className="text-2xl font-bold">
+          {primaryStudentName
+            ? `${primaryStudentName}'s Invoices`
+            : "My Invoices"}
+        </h1>
         <p className="text-sm text-slate-600 dark:text-slate-300">
           No invoices found for your account yet.
         </p>
@@ -45,20 +79,20 @@ const MyInvoices: React.FC = () => {
     );
   }
 
-  // Use the first invoice to display main student context
-  const primaryStudentId = invoices[0]?.student_id;
-  const primaryStudentName =
-    typeof primaryStudentId === "number"
-      ? findStudentName(primaryStudentId)
-      : undefined;
-
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">My Invoices</h1>
+      <h1 className="text-2xl font-bold">
+        {primaryStudentName
+          ? `${primaryStudentName}'s Invoices`
+          : "My Invoices"}
+      </h1>
       <p className="text-sm text-slate-600 dark:text-slate-300">
         Showing invoices for{" "}
         <span className="font-semibold">
-          {primaryStudentName ?? `Student #${primaryStudentId ?? "?"}`}
+          {primaryStudentName ??
+            (studentIdForContext != null
+              ? `Student #${studentIdForContext}`
+              : "your account")}
         </span>{" "}
         ({role} account).
       </p>

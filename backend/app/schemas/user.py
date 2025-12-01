@@ -1,11 +1,14 @@
 # backend/app/schemas/user.py
-from pydantic import BaseModel, EmailStr
 from typing import Optional
+
+from pydantic import BaseModel, EmailStr
+
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: str = "accountant"
+
 
 class UserOut(BaseModel):
     id: int
@@ -13,8 +16,12 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
 
+    # NEW: optional student mapping
+    student_id: Optional[int] = None
+
     class Config:
         from_attributes = True
+
 
 class Token(BaseModel):
     access_token: str

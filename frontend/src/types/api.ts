@@ -15,6 +15,8 @@ export type User = {
   email: string;
   full_name?: string | null;
   role?: "admin" | "clerk" | "student" | string;
+  // NEW: optional mapping to a Student row (for student/parent accounts)
+  student_id?: number | null;
 };
 
 export type ClassSection = {

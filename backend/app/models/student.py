@@ -2,7 +2,9 @@
 
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
+
 from app.db.base import Base
+
 
 class Student(Base):
     __tablename__ = "students"
@@ -14,19 +16,26 @@ class Student(Base):
 
     class_section = relationship(
         "ClassSection",
-        back_populates="students"
+        back_populates="students",
     )
 
     # Back-populates FeeAssignment.student
     fee_assignments = relationship(
         "FeeAssignment",
         back_populates="student",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
-    # NEW: Back-populates FeeInvoice.student (which likely uses back_populates="invoices")
+    # Back-populates FeeInvoice.student
     invoices = relationship(
         "FeeInvoice",
         back_populates="student",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+    )
+
+    # NEW: link back to User for student/parent logins
+    user = relationship(
+        "User",
+        back_populates="student",
+        uselist=False,
     )
