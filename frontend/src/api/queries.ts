@@ -11,6 +11,7 @@ import {
   FeeComponent,
   FeePlan,
   FeePlanComponent,
+  FeeAssignment,
 } from "../types/api";
 
 /* ------------------------------------------------------
@@ -44,6 +45,45 @@ export function useCreateStudent() {
   });
 }
 
+/**
+ * Update an existing student.
+ */
+export function useUpdateStudent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      name?: string;
+      roll_number?: string;
+      class_section_id?: number;
+    }): Promise<Student> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/students/${id}`, body);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["students"] });
+    },
+  });
+}
+
+/**
+ * Delete a student.
+ */
+export function useDeleteStudent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/students/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["students"] });
+    },
+  });
+}
+
 /* ------------------------------------------------------
    CLASS SECTIONS
 ------------------------------------------------------- */
@@ -67,6 +107,44 @@ export function useCreateClassSection() {
     }): Promise<ClassSection> => {
       const { data } = await api.post("/api/v1/class-sections/", payload);
       return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-sections"] });
+    },
+  });
+}
+
+/**
+ * Update an existing class section.
+ */
+export function useUpdateClassSection() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      name?: string;
+      academic_year?: string;
+    }): Promise<ClassSection> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/class-sections/${id}`, body);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["class-sections"] });
+    },
+  });
+}
+
+/**
+ * Delete a class section.
+ */
+export function useDeleteClassSection() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/class-sections/${id}`);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["class-sections"] });
@@ -235,7 +313,7 @@ export function useDeleteFeePlanComponent() {
 export function useFeeAssignments() {
   return useQuery({
     queryKey: ["fee-assignments"],
-    queryFn: async (): Promise<any[]> => {
+    queryFn: async (): Promise<FeeAssignment[]> => {
       const { data } = await api.get("/api/v1/fee-assignments");
       return data;
     },
@@ -252,7 +330,7 @@ export function useCreateFeeAssignment() {
       invoice_id?: number | null;
       concession?: number;
       note?: string;
-    }): Promise<any> => {
+    }): Promise<FeeAssignment> => {
       const { data } = await api.post("/api/v1/fee-assignments", payload);
       return data;
     },
@@ -262,14 +340,66 @@ export function useCreateFeeAssignment() {
   });
 }
 
+/**
+ * Update an existing fee assignment.
+ */
+export function useUpdateFeeAssignment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      invoice_id?: number | null;
+      concession?: number;
+      note?: string;
+    }): Promise<FeeAssignment> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/fee-assignments/${id}`, body);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-assignments"] });
+    },
+  });
+}
+
+/**
+ * Delete a fee assignment.
+ */
+export function useDeleteFeeAssignment() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/fee-assignments/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-assignments"] });
+    },
+  });
+}
+
 /* ------------------------------------------------------
-   LIST INVOICES
+   LIST INVOICES (admin)
 ------------------------------------------------------- */
 export function useInvoices() {
   return useQuery({
     queryKey: ["invoices"],
     queryFn: async (): Promise<Invoice[]> => {
       const { data } = await api.get("/api/v1/invoices/");
+      return data;
+    },
+  });
+}
+
+/* ------------------------------------------------------
+   LIST MY INVOICES (current user)
+------------------------------------------------------- */
+export function useMyInvoices() {
+  return useQuery({
+    queryKey: ["my-invoices"],
+    queryFn: async (): Promise<Invoice[]> => {
+      const { data } = await api.get("/api/v1/invoices/mine");
       return data;
     },
   });

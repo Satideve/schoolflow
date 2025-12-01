@@ -92,3 +92,17 @@ export type Receipt = {
   amount: number;
   created_at?: string | null;
 };
+
+/**
+ * Fee assignment linking a student to a fee plan (optionally to an invoice),
+ * with optional concession and note.
+ * Matches backend FeeAssignmentOut schema.
+ */
+export type FeeAssignment = {
+  id: number;
+  student_id: number;
+  fee_plan_id: number;
+  invoice_id?: number | null;
+  concession?: number | null;
+  note?: string | null;
+};

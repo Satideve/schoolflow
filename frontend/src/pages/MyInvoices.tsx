@@ -2,14 +2,25 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
-import { useInvoices } from "../api/queries";
+import { useMyInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 
 const MyInvoices: React.FC = () => {
   const { user } = useAuth();
   const role = user?.role ?? "user";
 
-  const { data, isLoading, isError } = useInvoices();
+  const { data, isLoading, isError } = useMyInvoices();
+  const { data: studentsData } = useStudents();
+
+  const invoices = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+  const students = Array.isArray(studentsData)
+    ? studentsData
+    : (studentsData ?? []);
+
+  const findStudentName = (studentId: number) => {
+    const match = students.find((s: any) => s.id === studentId);
+    return match?.name ?? `Student #${studentId}`;
+  };
 
   if (isLoading) {
     return <div>Loading my invoices...</div>;
@@ -23,8 +34,6 @@ const MyInvoices: React.FC = () => {
     );
   }
 
-  const invoices = Array.isArray(data) ? data : (data?.results ?? data ?? []);
-
   if (!invoices || invoices.length === 0) {
     return (
       <div className="bg-white p-6 rounded shadow space-y-3">
@@ -36,11 +45,22 @@ const MyInvoices: React.FC = () => {
     );
   }
 
+  // Use the first invoice to display main student context
+  const primaryStudentId = invoices[0]?.student_id;
+  const primaryStudentName =
+    typeof primaryStudentId === "number"
+      ? findStudentName(primaryStudentId)
+      : undefined;
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">My Invoices</h1>
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        Showing invoices visible to your {role} account.
+        Showing invoices for{" "}
+        <span className="font-semibold">
+          {primaryStudentName ?? `Student #${primaryStudentId ?? "?"}`}
+        </span>{" "}
+        ({role} account).
       </p>
 
       <div className="bg-white rounded shadow overflow-x-auto">

@@ -2,6 +2,7 @@
 import React from "react";
 import { useAuth } from "../store/auth";
 import { useReceipts } from "../api/queries";
+import { formatMoney } from "../lib/utils";
 
 const MyReceipts: React.FC = () => {
   const { user } = useAuth();
@@ -36,6 +37,15 @@ const MyReceipts: React.FC = () => {
 
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "-";
+    try {
+      return new Date(value).toLocaleString();
+    } catch {
+      return String(value);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">My Receipts</h1>
@@ -49,7 +59,7 @@ const MyReceipts: React.FC = () => {
             <tr>
               <th className="p-2 text-left">Receipt No</th>
               <th className="p-2 text-left">Invoice ID</th>
-              <th className="p-2 text-left">Amount</th>
+              <th className="p-2 text-right">Amount</th>
               <th className="p-2 text-left">Created At</th>
               <th className="p-2 text-left">Actions</th>
             </tr>
@@ -59,8 +69,12 @@ const MyReceipts: React.FC = () => {
               <tr key={r.id} className="border-t">
                 <td className="p-2">{r.receipt_no ?? "-"}</td>
                 <td className="p-2">{r.invoice_id ?? "-"}</td>
-                <td className="p-2">{r.amount ?? "-"}</td>
-                <td className="p-2">{r.created_at ?? "-"}</td>
+                <td className="p-2 text-right">
+                  {formatMoney(
+                    Number(r.amount != null ? r.amount : 0) || 0
+                  )}
+                </td>
+                <td className="p-2">{formatDateTime(r.created_at)}</td>
                 <td className="p-2">
                   <a
                     href={`${base}/api/v1/receipts/${r.id}/download`}
