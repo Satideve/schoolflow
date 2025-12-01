@@ -3,13 +3,16 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
-/* Replaced @apply with direct CSS colors to avoid Tailwind @apply issues during dev */
+/* Global defaults; all other styling done via Tailwind classes in JSX */
 body {
   background-color: #f8fafc; /* tailwind bg-gray-50 */
   color: #0f172a; /* tailwind text-gray-900 */
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
 }

@@ -1,4 +1,4 @@
-/* C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx */
+// C:\coding_projects\dev\schoolflow\frontend\src\components\layout\Navbar.tsx
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../store/auth";
@@ -6,7 +6,8 @@ import { useStudents } from "../../api/queries";
 
 export default function Navbar() {
   const auth = useAuth();
-  const role: string | undefined = auth.user?.role;
+  const user = auth.user;
+  const role: string | undefined = user?.role;
 
   const isAdminLike =
     role === "admin" || role === "clerk" || role === "accountant";
@@ -15,32 +16,54 @@ export default function Navbar() {
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "User";
 
-  // -----------------------------
-  // Student name lookup
-  // -----------------------------
-  const { data: students } = useStudents();
+  // Load all students (React Query cache is shared; this will be fast after first load)
+  const { data: studentsData } = useStudents();
+  const students = Array.isArray(studentsData)
+    ? studentsData
+    : studentsData ?? [];
 
-  const studentName = useMemo(() => {
-    const studentId = (auth.user as any)?.student_id;
-    if (!studentId) return null;
+  /**
+   * Try to compute a human-friendly display name for the current user.
+   *
+   * For students:
+   *   - Prefer looking up the Student row by user.student_id (linked in DB)
+   *   - Fallback: any student whose name matches, or just "Student"
+   * For admins:
+   *   - Show email
+   */
+  const displayStudentName = useMemo(() => {
+    if (!user || role !== "student") return undefined;
 
-    const list = Array.isArray(students) ? students : students ?? [];
-    const match = list.find((s: any) => s.id === studentId);
-    return match?.name ?? null;
-  }, [students, (auth.user as any)?.student_id]);
+    const studentId = (user as any).student_id as number | undefined;
+    if (studentId && students.length > 0) {
+      const match = students.find((s: any) => s.id === studentId);
+      if (match?.name) return match.name as string;
+    }
 
-  // -----------------------------
-  // Display label on right side
-  // -----------------------------
-  let displayUser = roleLabel;
-  if (isAdminLike) {
-    const idLabel = auth.user?.id ? `#${auth.user.id}` : "";
-    displayUser = [roleLabel, idLabel].filter(Boolean).join(" ");
-  } else if (studentName) {
-    displayUser = studentName;
-  } else if (role === "student") {
-    displayUser = "Student";
-  }
+    // Fallbacks if mapping is weird:
+    // - Try a `student_name` field if backend ever sends it
+    if ((user as any).student_name) {
+      return (user as any).student_name as string;
+    }
+    // - Try a generic `name`
+    if ((user as any).name) {
+      return (user as any).name as string;
+    }
+
+    return undefined;
+  }, [user, role, students]);
+
+  // Primary label:
+  // - For students: prefer displayStudentName; fallback to email
+  // - For admins: prefer email; fallback to role
+  const primaryLabel =
+    displayStudentName || user?.email || roleLabel;
+
+  // Secondary label: Role + #id for all authenticated users
+  const secondaryLabel =
+    user && roleLabel
+      ? `${roleLabel}${user.id ? ` #${user.id}` : ""}`
+      : "";
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow">
@@ -132,26 +155,42 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* RIGHT: user + auth buttons */}
+          {/* RIGHT: user info + auth actions */}
           <div className="flex items-center gap-4">
-            <div className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-              {displayUser}
-            </div>
-
             {auth.token ? (
-              <button
-                onClick={() => auth.logout()}
-                className="text-sm text-red-600 hover:text-red-700 px-2 py-1"
-              >
-                Logout
-              </button>
+              <>
+                <div className="flex flex-col items-end text-right">
+                  <span className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                    {primaryLabel}
+                  </span>
+                  {secondaryLabel && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      {secondaryLabel}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => auth.logout()}
+                  className="text-sm text-red-600 hover:text-red-700 px-2 py-1"
+                >
+                  Logout
+                </button>
+              </>
             ) : (
-              <Link
-                to="/login"
-                className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1"
-              >
-                Login
-              </Link>
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm text-blue-600 hover:text-blue-700 px-2 py-1"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="text-sm text-slate-700 hover:text-slate-900 px-2 py-1 border border-slate-300 rounded-md"
+                >
+                  Register
+                </Link>
+              </>
             )}
           </div>
         </div>

@@ -16,8 +16,9 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
 
-    # NEW: optional student mapping
+    # NEW: link to student
     student_id: Optional[int] = None
+    student_name: Optional[str] = None   # <-- REQUIRED for showing full name
 
     class Config:
         from_attributes = True

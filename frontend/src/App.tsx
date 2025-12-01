@@ -5,6 +5,7 @@ import Shell from "./components/layout/Shell";
 import RouteGuard from "./components/RouteGuard";
 
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import About from "./pages/About";
 import InvoicesList from "./pages/InvoicesList";
@@ -19,7 +20,6 @@ import ClassSections from "./pages/ClassSections";
 import Students from "./pages/Students";
 import FeeComponents from "./pages/FeeComponents";
 import FeePlans from "./pages/FeePlans";
-import FeePlanDetail from "./pages/FeePlanDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./store/auth";
 
@@ -43,8 +43,23 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      {/* Public login */}
-      <Route path="/login" element={<Login />} />
+      {/* Public auth pages (with Shell so Navbar is visible) */}
+      <Route
+        path="/login"
+        element={
+          <Shell>
+            <Login />
+          </Shell>
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          <Shell>
+            <Register />
+          </Shell>
+        }
+      />
 
       {/* Dashboard (any authenticated user) */}
       <Route
@@ -189,20 +204,6 @@ export default function App() {
             <Shell>
               <AdminRoute>
                 <FeePlans />
-              </AdminRoute>
-            </Shell>
-          </RouteGuard>
-        }
-      />
-
-      {/* Admin-only: Fee Plan Detail */}
-      <Route
-        path="/fee-plans/:id"
-        element={
-          <RouteGuard>
-            <Shell>
-              <AdminRoute>
-                <FeePlanDetail />
               </AdminRoute>
             </Shell>
           </RouteGuard>
