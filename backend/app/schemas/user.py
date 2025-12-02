@@ -5,9 +5,18 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserCreate(BaseModel):
+    """
+    Payload for creating a new user via /auth/register or admin APIs.
+
+    - email: login email
+    - password: plain text password (will be hashed server-side)
+    - role: defaults to "student" for safety; backend may override/validate.
+    - student_id: optional link to an existing Student row
+    """
     email: EmailStr
     password: str
-    role: str = "accountant"
+    role: str = "student"
+    student_id: Optional[int] = None
 
 
 class UserOut(BaseModel):
@@ -16,9 +25,8 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
 
-    # NEW: link to student
+    # optional student mapping (used for student dashboards / “My invoices”)
     student_id: Optional[int] = None
-    student_name: Optional[str] = None   # <-- REQUIRED for showing full name
 
     class Config:
         from_attributes = True

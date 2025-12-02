@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import logging
-from typing import Optional
+from typing import List, Optional
 
 # from app.schemas.user import UserCreate, UserOut, Token
 from app.schemas.user import UserCreate, UserOut
@@ -15,6 +15,8 @@ from app.schemas.auth import Token
 from app.db.session import get_db
 from app.models.user import User
 from app.core.config import settings
+from app.models.student import Student
+
 
 logger = logging.getLogger("app.auth")
 
@@ -184,20 +186,72 @@ def get_current_user(
     return user
 
 
-@router.post("/register", response_model=UserOut)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    # rudimentary; in prod add validations and email confirmation
-    existing = db.query(User).filter(User.email == user_in.email).first()
+@router.post(
+    "/register",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Public registration endpoint.
+
+    Rules:
+    - Always creates a 'student' user (ignores incoming role to avoid elevation).
+    - If student_id is provided:
+        * Student must exist.
+        * No other user may already be linked to this student_id.
+    """
+
+    # 1) Ensure email is unique
+    existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(
-            status_code=400, detail={"code": "user_exists", "message": "User exists"}
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already registered",
         )
-    # hash password (truncation applied inside helper)
-    hashed = get_password_hash(user_in.password)
-    user = User(email=user_in.email, hashed_password=hashed, role=user_in.role)
+
+    # 2) Validate student_id linkage if provided
+    student_id: Optional[int] = payload.student_id
+
+    if student_id is not None:
+        # Check that the student exists
+        student = db.query(Student).filter(Student.id == student_id).first()
+        if not student:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Student with id {student_id} does not exist",
+            )
+
+        # Ensure no other user is already linked to this student
+        existing_link = (
+            db.query(User)
+            .filter(User.student_id == student_id)
+            .first()
+        )
+        if existing_link:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This student already has a linked user account",
+            )
+
+    # 3) Hash password and force safe role
+    hashed = get_password_hash(payload.password)
+
+    user = User(
+        email=payload.email,
+        hashed_password=hashed,
+        role="student",        # force student for public registration
+        is_active=True,
+        student_id=student_id, # may be None
+    )
+
     db.add(user)
     db.commit()
     db.refresh(user)
+
     return user
 
 
