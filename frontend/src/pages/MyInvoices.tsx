@@ -34,7 +34,7 @@ const MyInvoices: React.FC = () => {
 
   const invoicesExist = invoices && invoices.length > 0;
 
-  // For context, prefer the mapping from the logged-in user to a student
+  // Prefer student_id mapped from the logged-in user
   const studentIdFromUser =
     user && typeof (user as any).student_id === "number"
       ? (user as any).student_id
@@ -78,6 +78,8 @@ const MyInvoices: React.FC = () => {
       </div>
     );
   }
+
+  const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
   return (
     <div className="space-y-4">
@@ -143,13 +145,25 @@ const MyInvoices: React.FC = () => {
                   <td className="p-2 text-right">
                     {formatMoney(isNaN(balance) ? 0 : balance)}
                   </td>
-                  <td className="p-2 text-right">
-                    <Link
-                      to={`/invoices/${inv.id}`}
-                      className="text-blue-600"
-                    >
-                      View
-                    </Link>
+                  <td className="p-2">
+                    <div className="flex items-center justify-end gap-2">
+                      {/* student-friendly detail route */}
+                      <Link
+                        to={`/my/invoices/${inv.id}`}
+                        className="text-blue-600"
+                      >
+                        Open
+                      </Link>
+                      {/* direct PDF link, same as before conceptually */}
+                      <a
+                        href={`${base}/api/v1/invoices/${inv.id}/download`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-slate-600 hover:text-slate-900"
+                      >
+                        PDF
+                      </a>
+                    </div>
                   </td>
                 </tr>
               );

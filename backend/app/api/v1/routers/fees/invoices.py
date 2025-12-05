@@ -27,7 +27,7 @@ from app.api.dependencies.auth import get_current_user, require_roles
 
 # Use context loader to compute items_total / total_due / paid_amount / balance / items
 from app.services.pdf.context_loader import load_invoice_context
-# allow on-demand PDF render if file is missing
+# Renderer for PDFs
 from app.services.pdf.renderer import render_invoice_pdf
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
@@ -242,10 +242,17 @@ def download_invoice(
     db: Session = Depends(get_db),
 ):
     """
-    Stream the pre-generated PDF for a given invoice.
-    Admin/clerk see all; students see only their own.
+    Stream the (re-)rendered PDF for a given invoice.
 
-    If the PDF file is missing, we render it on-demand using the current context.
+    RBAC:
+    - Admin/clerk see all.
+    - Students/parents: only invoices whose student_id matches their mapped student_id.
+
+    IMPORTANT:
+    - We ALWAYS attempt to render a fresh PDF using the current invoice context
+      (items, totals, payments, balance).
+    - If rendering fails but an existing PDF file is present, we fall back to that file.
+    - If rendering fails and no file exists, we raise 500.
     """
     logger.info(
         f"action=download_invoice request_id={request.state.request_id} "
@@ -259,32 +266,46 @@ def download_invoice(
             detail="Invoice not found",
         )
 
+    # RBAC check
     if current_user.role not in ("admin", "clerk"):
         if current_user.student_id is None or current_user.student_id != inv.student_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized",
+            )
 
     filename = f"INV-{inv.invoice_no}.pdf"
     pdf_path = settings.invoices_path() / filename
 
-    # On-demand render if file missing
-    if not pdf_path.exists():
-        try:
-            ctx = load_invoice_context(inv.id, db)
-            # Ensure directory exists
-            Path(pdf_path.parent).mkdir(parents=True, exist_ok=True)
-            render_invoice_pdf(ctx, str(pdf_path))
-            logger.info(
-                "On-demand rendered invoice PDF to %s for invoice %s (id=%s)",
-                str(pdf_path),
-                inv.invoice_no,
-                inv.id,
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Unable to render invoice PDF: {e}",
-            )
+    # Try to (re-)render the latest PDF based on current context
+    render_error: Exception | None = None
+    try:
+        ctx = load_invoice_context(inv.id, db)
+        Path(pdf_path.parent).mkdir(parents=True, exist_ok=True)
+        render_invoice_pdf(ctx, str(pdf_path))
+        logger.info(
+            "Rendered (or updated) invoice PDF at %s for invoice %s (id=%s)",
+            str(pdf_path),
+            inv.invoice_no,
+            inv.id,
+        )
+    except Exception as e:
+        render_error = e
+        logger.exception(
+            "Failed to render invoice PDF for invoice %s (id=%s): %s",
+            inv.invoice_no,
+            inv.id,
+            e,
+        )
 
+    # If we couldn't render AND the file doesn't exist, treat as server error
+    if render_error is not None and not pdf_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unable to render invoice PDF: {render_error}",
+        )
+
+    # At this point, either we have a freshly rendered file, or we fall back to an existing one.
     return FileResponse(
         path=str(pdf_path),
         media_type="application/pdf",

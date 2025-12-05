@@ -23,7 +23,9 @@ export default function InvoicesList() {
     return <div className="text-red-600">Failed to load invoices.</div>;
   }
 
-  const invoicesRaw = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+  const invoicesRaw = Array.isArray(data)
+    ? data
+    : (data?.results ?? data ?? []);
 
   const studentNameById = new Map<number, string>();
   students?.forEach((s: any) => {
@@ -38,7 +40,9 @@ export default function InvoicesList() {
 
     return (invoicesRaw as any[]).filter((inv) => {
       const totalDue =
-        inv.total_due != null ? Number(inv.total_due) : Number(inv.amount_due ?? 0);
+        inv.total_due != null
+          ? Number(inv.total_due)
+          : Number(inv.amount_due ?? 0);
       const paid = Number(inv.paid_amount ?? 0);
       const balance =
         inv.balance != null && !Number.isNaN(Number(inv.balance))
@@ -55,10 +59,15 @@ export default function InvoicesList() {
   if (!invoices || invoices.length === 0) {
     return (
       <div className="bg-white p-6 rounded shadow text-center">
-        No invoices found.
+        <h1 className="text-2xl font-bold mb-2">Invoices</h1>
+        <p className="text-sm text-slate-600">
+          No invoices found.
+        </p>
       </div>
     );
   }
+
+  const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
   return (
     <div>
@@ -92,10 +101,12 @@ export default function InvoicesList() {
               <th className="p-2 text-left">Invoice No</th>
               <th className="p-2 text-left">Student</th>
               <th className="p-2 text-left">Period</th>
+              <th className="p-2 text-left">Due Date</th>
               <th className="p-2 text-right">Total Due</th>
               <th className="p-2 text-right">Paid</th>
               <th className="p-2 text-right">Balance</th>
-              <th className="p-2 text-left"></th>
+              <th className="p-2 text-left">Status</th>
+              <th className="p-2 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -124,6 +135,9 @@ export default function InvoicesList() {
                   <td className="p-2">{inv.invoice_no}</td>
                   <td className="p-2">{studentName}</td>
                   <td className="p-2">{inv.period}</td>
+                  <td className="p-2">
+                    {inv.due_date ? String(inv.due_date) : "-"}
+                  </td>
                   <td className="p-2 text-right">
                     {formatMoney(isNaN(totalDue) ? 0 : totalDue)}
                   </td>
@@ -133,13 +147,26 @@ export default function InvoicesList() {
                   <td className="p-2 text-right">
                     {formatMoney(isNaN(balance) ? 0 : balance)}
                   </td>
-                  <td className="p-2 text-right">
-                    <Link
-                      to={`/invoices/${inv.id}`}
-                      className="text-blue-600"
-                    >
-                      Open
-                    </Link>
+                  <td className="p-2 capitalize">
+                    {inv.status ?? "-"}
+                  </td>
+                  <td className="p-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        to={`/invoices/${inv.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        Open
+                      </Link>
+                      <a
+                        href={`${base}/api/v1/invoices/${inv.id}/download`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-green-700 hover:underline"
+                      >
+                        PDF
+                      </a>
+                    </div>
                   </td>
                 </tr>
               );

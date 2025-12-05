@@ -3,7 +3,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Receipt - {{ receipt_no or receipt.id }}</title>
+    <title>Receipt - {{ receipt_no or (receipt.id if receipt else "") }}</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
       .header { text-align: center; margin-bottom: 12px; }
@@ -24,76 +24,83 @@
     </div>
 
     <div class="section">
-      <strong>Student:</strong> {{ student_name or (student.email if student else '') }}<br/>
-      <strong>Receipt ID:</strong> {{ receipt_id or (receipt.id if receipt else '') }}<br/>
-      <strong>Invoice No:</strong> {{ invoice_no or (invoice.invoice_no if invoice else '') }}<br/>
-      <strong>Issued:</strong> {{ issued_date or '' }}
+      <strong>Student:</strong> {{ student_name or (student.email if student else "") }}<br/>
+      <strong>Receipt ID:</strong> {{ receipt_id or (receipt.id if receipt else "") }}<br/>
+      <strong>Invoice No:</strong> {{ invoice_no or (invoice.invoice_no if invoice else "") }}<br/>
+      <strong>Issued:</strong> {{ issued_date or "" }}
     </div>
 
     <div class="section">
       <table>
         <thead>
-          <tr><th>Description</th><th class="right">Amount (INR)</th></tr>
+          <tr>
+            <th>Description</th>
+            <th class="right">Amount (INR)</th>
+          </tr>
         </thead>
         <tbody>
           {%- if items and items|length > 0 -%}
             {%- for it in items -%}
               <tr>
                 <td>{{ it.description or ("Component " ~ (it.id if it.id else "")) }}</td>
-                {# show item.amount when present; else fall back to receipt amount or paid_amount #}
                 <td class="right">
-                  {%- set display_amount = it.amount if it.amount is not none else (amount if amount is not none else (paid_amount if paid_amount is not none else None)) -%}
-                  {{ ('%.2f'|format(display_amount)) if display_amount is not none else '-' }}
+                  {{ '%.2f'|format((it.amount if it.amount is not none else 0)|float) }}
                 </td>
               </tr>
             {%- endfor -%}
           {%- else -%}
             <tr>
               <td>Fees Paid</td>
-              <td class="right">{{ '%.2f'|format(amount if amount is not none else (payment.amount if payment else 0)) }}</td>
+              {# amount in context = this instalment's payment amount #}
+              <td class="right">
+                {{ '%.2f'|format((amount if amount is not none else 0)|float) }}
+              </td>
             </tr>
           {%- endif -%}
         </tbody>
         <tfoot>
-          {# If items_total computed is present, show it #}
           {%- if items_total is not none -%}
           <tr>
             <td class="right">Items Total</td>
-            <td class="right">{{ '%.2f'|format(items_total) }}</td>
+            <td class="right">{{ '%.2f'|format(items_total|float) }}</td>
           </tr>
           {%- endif -%}
+
           <tr>
             <td class="right">Total Due</td>
             <td class="right">
               {%- if total_due is not none -%}
-                {{ '%.2f'|format(total_due) }}
-              {%- elif amount is not none -%}
-                {{ '%.2f'|format(amount) }}
+                {{ '%.2f'|format(total_due|float) }}
               {%- elif amount_due is not none -%}
-                {{ '%.2f'|format(amount_due) }}
-              {%- else -%}-
-              {%- endif -%}
+                {{ '%.2f'|format(amount_due|float) }}
+              {%- else -%}-{% endif -%}
             </td>
           </tr>
+
           <tr>
             <td class="right">Paid Amount</td>
             <td class="right">
               {%- if paid_amount is not none -%}
-                {{ '%.2f'|format(paid_amount) }}
-              {%- elif payment and payment.amount is not none -%}
-                {{ '%.2f'|format(payment.amount) }}
-              {%- else -%}0.00
+                {{ '%.2f'|format(paid_amount|float) }}
+              {%- else -%}
+                0.00
               {%- endif -%}
             </td>
           </tr>
+
           <tr>
             <td class="right">Balance</td>
             <td class="right">
               {%- if balance is not none -%}
-                {{ '%.2f'|format(balance) }}
+                {{ '%.2f'|format(balance|float) }}
               {%- else -%}
-                {%- set pd = (paid_amount if paid_amount is not none else (payment.amount if payment and payment.amount is not none else 0.0)) -%}
-                {%- set td = (total_due if total_due is not none else (amount if amount is not none else (amount_due if amount_due is not none else 0.0))) -%}
+                {# Fallback compute from total_due and paid_amount if needed #}
+                {%- set pd = (paid_amount if paid_amount is not none else 0)|float -%}
+                {%- set td = (
+                  total_due
+                  if total_due is not none
+                  else (amount_due if amount_due is not none else 0)
+                )|float -%}
                 {{ '%.2f'|format(td - pd) }}
               {%- endif -%}
             </td>
@@ -103,8 +110,10 @@
     </div>
 
     <div class="section">
-      <strong>Payment Transaction:</strong> {{ payment.provider_txn_id if payment else '' }}<br/>
-      <strong>Paid At:</strong> {{ payment.created_at.isoformat() if payment and payment.created_at else '' }}
+      <strong>This payment:</strong>
+      {{ '%.2f'|format((amount if amount is not none else 0)|float) }}<br/>
+      <strong>Payment Transaction:</strong> {{ payment.provider_txn_id if payment else "" }}<br/>
+      <strong>Paid At:</strong> {{ payment.created_at.isoformat() if payment and payment.created_at else "" }}
     </div>
 
     <div class="section muted">

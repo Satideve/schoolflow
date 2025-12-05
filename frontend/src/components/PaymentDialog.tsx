@@ -1,6 +1,6 @@
 /* C:\coding_projects\dev\schoolflow\frontend\src\components\PaymentDialog.tsx */
 /**
- * PaymentDialog — modal used to collect payment details. Renders into document.body via portal.
+ * PaymentDialog â€“ modal used to collect payment details. Renders into document.body via portal.
  * Improved centering and visibility: uses fixed top/left + transform centering, higher z-index,
  * and max-height with internal scrolling to ensure it is always visible and usable.
  */
@@ -15,7 +15,12 @@ type Props = {
   loading?: boolean;
 };
 
-export default function PaymentDialog({ open, onOpenChange, onSubmit, loading }: Props) {
+export default function PaymentDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  loading,
+}: Props) {
   const [amount, setAmount] = useState<string>("");
   const [provider, setProvider] = useState<string>("manual");
   const [note, setNote] = useState<string>("");
@@ -26,8 +31,9 @@ export default function PaymentDialog({ open, onOpenChange, onSubmit, loading }:
       setProvider("manual");
       setNote("");
     } else {
-      console.log("PaymentDialog opened — portal should be mounted to document.body");
-      // small debug: log viewport height and scroll position
+      console.log(
+        "PaymentDialog opened â€“ portal should be mounted to document.body",
+      );
       console.log("viewport height:", window.innerHeight, "scrollY:", window.scrollY);
     }
   }, [open]);
@@ -69,27 +75,43 @@ export default function PaymentDialog({ open, onOpenChange, onSubmit, loading }:
 
   const modal = (
     <div style={modalWrapperStyle} data-payment-dialog>
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={handleClose}
         aria-hidden="true"
         style={{ zIndex: 99998 }}
       />
-      <div role="dialog" aria-modal="true" style={dialogStyle} className="relative z-[99999] bg-white rounded-lg shadow-lg p-6">
+
+      {/* Dialog panel */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={dialogStyle}
+        className="relative z-[99999] bg-white rounded-lg shadow-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between">
           <h3 className="text-lg font-semibold">Collect Payment</h3>
-          <button onClick={handleClose} aria-label="Close" className="text-sm text-gray-700 hover:underline">
+          <button
+            onClick={handleClose}
+            aria-label="Close"
+            className="text-sm text-gray-700 hover:underline"
+            type="button"
+          >
             Close
           </button>
         </div>
 
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Amount</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Amount
+            </label>
             <input
               type="number"
               step="0.01"
-              min="0"
+              min="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="mt-1 block w-full rounded border px-3 py-2"
@@ -99,7 +121,9 @@ export default function PaymentDialog({ open, onOpenChange, onSubmit, loading }:
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Provider</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Provider
+            </label>
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
@@ -112,7 +136,9 @@ export default function PaymentDialog({ open, onOpenChange, onSubmit, loading }:
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Note (optional)</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Note (optional)
+            </label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}

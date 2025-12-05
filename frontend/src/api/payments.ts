@@ -21,7 +21,9 @@ type OrderResponse = {
 };
 
 function makeId(prefix = "manual") {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 export async function createPaymentOrder(
@@ -37,8 +39,19 @@ export async function createPaymentOrder(
     ...(payload.note ? { note: payload.note } : {}),
   };
 
+  // Debug: log what we are about to call
+  console.debug(
+    "[payments] createPaymentOrder → POST /api/v1/payments/create-order/",
+    invoiceId,
+    "body:",
+    body
+  );
+
   // 1) create order (amount in paise)
-  const orderResp = await client.post(`/api/v1/payments/create-order/${invoiceId}`, body);
+  const orderResp = await client.post(
+    `/api/v1/payments/create-order/${invoiceId}`,
+    body
+  );
   const orderData = orderResp.data;
 
   // If provider is manual, try to immediately simulate a webhook to mark as captured.
@@ -58,13 +71,25 @@ export async function createPaymentOrder(
         note: payload.note ?? null,
       };
 
-      const webhookResp = await client.post(`/api/v1/payments/webhook`, webhookBody);
+      console.debug(
+        "[payments] simulate manual webhook → POST /api/v1/payments/webhook body:",
+        webhookBody
+      );
+
+      const webhookResp = await client.post(
+        `/api/v1/payments/webhook`,
+        webhookBody
+      );
       return { order: orderData, webhook: webhookResp.data };
     } catch (err: any) {
-      console.error("Manual webhook simulation failed:", err?.response?.data ?? err?.message ?? err);
+      console.error(
+        "Manual webhook simulation failed:",
+        err?.response?.data ?? err?.message ?? err
+      );
       return { order: orderData, webhook: null };
     }
   }
 
+  // For non-manual providers, just return the order info.
   return { order: orderData };
 }

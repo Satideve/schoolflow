@@ -233,6 +233,17 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/my/invoices/:id"
+        element={
+          <RouteGuard>
+            <Shell>
+              <InvoiceDetail />
+            </Shell>
+          </RouteGuard>
+        }
+      />  
+
       {/* About for any authenticated user */}
       <Route
         path="/about"

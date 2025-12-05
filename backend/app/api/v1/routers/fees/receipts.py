@@ -1,16 +1,17 @@
 # backend/app/api/v1/routers/fees/receipts.py
 import os
 from pathlib import Path
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, Security, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.schemas.fee.receipt import ReceiptCreate, ReceiptOut
 from app.services.fee.receipt_service import ReceiptService
 from app.api.v1.dependencies import get_db
-from app.api.v1.routers.auth import get_current_user
+from app.api.v1.routers.auth import get_current_user  # keep existing import
 from app.models.fee.receipt import Receipt
 from app.models.fee.payment import Payment
 from app.models.fee.fee_invoice import FeeInvoice as Invoice
@@ -26,11 +27,7 @@ def _build_receipt_out(db: Session, receipt: Receipt) -> ReceiptOut:
     """
     Build ReceiptOut including derived invoice_id and amount from Payment.
     """
-    payment = (
-        db.query(Payment)
-        .filter(Payment.id == receipt.payment_id)
-        .first()
-    )
+    payment = db.query(Payment).filter(Payment.id == receipt.payment_id).first()
 
     invoice_id = None
     amount = None
@@ -58,7 +55,9 @@ def _build_receipt_out(db: Session, receipt: Receipt) -> ReceiptOut:
 # - Student/Parent: only if receipt belongs to their own student_id (via invoice linkage)
 # - Others: forbidden
 def _enforce_role_or_ownership(
-    db: Session, current_user, receipt: Receipt
+    db: Session,
+    current_user,
+    receipt: Receipt,
 ) -> None:
     """
     Enforce RBAC:
@@ -66,22 +65,70 @@ def _enforce_role_or_ownership(
     - Student/Parent: only if receipt belongs to their student_id
     """
     role = getattr(current_user, "role", None)
+
+    # Admin / clerk can always access
     if role in {"admin", "clerk"}:
         return
 
+    # Student / parent must match invoice.student_id
     if role in {"student", "parent"}:
-        # Ownership check via payment -> invoice -> student
-        payment = db.query(Payment).filter(Payment.id == receipt.payment_id).first()
+        student_id = getattr(current_user, "student_id", None)
+        if student_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "forbidden", "message": "Not authorized"},
+            )
+
+        # 1) Load payment for this receipt
+        payment = (
+            db.query(Payment)
+            .filter(Payment.id == receipt.payment_id)
+            .first()
+        )
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "not_found", "message": "Payment not found"},
             )
-        invoice = db.query(Invoice).filter(
-            Invoice.id == getattr(payment, "fee_invoice_id", None)
-            or getattr(payment, "invoice_id", None)
-        ).first()
-        if not invoice or invoice.student_id != getattr(current_user, "student_id", None):
+
+        # 2) Resolve invoice robustly (relationship or FK fields)
+        invoice = None
+
+        # Prefer relationship if present
+        try:
+            rel = getattr(payment, "invoice", None)
+            if rel is not None:
+                invoice = rel
+        except Exception:
+            invoice = None
+
+        # Fallback: use fee_invoice_id / invoice_id
+        if invoice is None:
+            inv_id = None
+            fee_inv_id = getattr(payment, "fee_invoice_id", None)
+            if fee_inv_id is not None:
+                inv_id = fee_inv_id
+            else:
+                inv_id = getattr(payment, "invoice_id", None)
+
+            if inv_id is not None:
+                invoice = (
+                    db.query(Invoice)
+                    .filter(Invoice.id == inv_id)
+                    .first()
+                )
+
+        if not invoice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "code": "not_found",
+                    "message": "Invoice not found for this payment",
+                },
+            )
+
+        # 3) Check that invoice belongs to this student's account
+        if getattr(invoice, "student_id", None) != student_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -89,6 +136,7 @@ def _enforce_role_or_ownership(
                     "message": "Not authorized to access this receipt",
                 },
             )
+
         return
 
     # Default: deny for unknown roles
@@ -124,10 +172,11 @@ def create_receipt(
     # Idempotency: return existing receipt if already present
     existing = service.get_by_payment_id(payload.payment_id)
     if existing:
-        return _build_receipt_out(db, existing)
+        # existing is ReceiptOut already
+        return existing
 
     try:
-        # Service handles payment?invoice?student validation + rendering
+        # Service handles payment→invoice→student validation + rendering
         receipt = service.create_receipt_and_render(
             payment_id=payload.payment_id,
             receipt_no=payload.receipt_no,
@@ -142,6 +191,9 @@ def create_receipt(
                 "message": "Receipt number already in use.",
             },
         )
+    except HTTPException:
+        # pass through our structured HTTPExceptions
+        raise
     except Exception as exc:
         # Validation/other errors: standardized shape
         raise HTTPException(
@@ -149,7 +201,7 @@ def create_receipt(
             detail={"code": "validation_error", "message": str(exc)},
         )
 
-    return _build_receipt_out(db, receipt)
+    return receipt
 
 
 @router.get("/", response_model=List[ReceiptOut], status_code=status.HTTP_200_OK)
@@ -159,9 +211,8 @@ def list_receipts(
 ):
     """
     Return metadata for all receipts (primary list endpoint).
-    Kept consistent with /metadata endpoint:
     - Admin/Clerk: see all
-    - Student/Parent: see only their own receipts
+    - Student/Parent: see only their own receipts (via invoice.student_id)
     """
     role = getattr(current_user, "role", None)
     query = db.query(Receipt).order_by(Receipt.created_at.desc())
@@ -169,6 +220,7 @@ def list_receipts(
     if role in {"admin", "clerk"}:
         receipts = query.all()
     elif role in {"student", "parent"}:
+        # Scope to current user's student_id via joins
         receipts = (
             query.join(Payment, Receipt.payment_id == Payment.id)
             .join(Invoice, Payment.fee_invoice_id == Invoice.id)
@@ -190,19 +242,16 @@ def list_receipts_metadata(
     current_user=Security(get_current_user),
 ):
     """
-    Return metadata for all receipts.
-    Useful for dashboards, admin views, and audit reports.
+    Return metadata for all receipts (for dashboards, admin views, audit, etc.).
     - Admin/Clerk: see all
     - Student/Parent: see only their own receipts
     """
     role = getattr(current_user, "role", None)
-    # Order by most recent first for dashboard friendliness
     query = db.query(Receipt).order_by(Receipt.created_at.desc())
 
     if role in {"admin", "clerk"}:
         receipts = query.all()
     elif role in {"student", "parent"}:
-        # Scope to current user's student_id via joins
         receipts = (
             query.join(Payment, Receipt.payment_id == Payment.id)
             .join(Invoice, Payment.fee_invoice_id == Invoice.id)
@@ -210,7 +259,6 @@ def list_receipts_metadata(
             .all()
         )
     else:
-        # Unknown/unsupported role
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "forbidden", "message": "Not authorized"},
@@ -228,7 +276,6 @@ def get_receipt_metadata(
     """
     Preview-only JSON metadata for a single receipt.
     """
-    # Fetch target receipt
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(
@@ -236,7 +283,6 @@ def get_receipt_metadata(
             detail={"code": "not_found", "message": "Receipt not found"},
         )
 
-    # Enforce RBAC/ownership
     _enforce_role_or_ownership(db, current_user, receipt)
     return _build_receipt_out(db, receipt)
 
@@ -250,7 +296,6 @@ def get_receipt(
     """
     Fetch a single receipt by its ID and return its metadata.
     """
-    # Fetch target receipt
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(
@@ -258,7 +303,6 @@ def get_receipt(
             detail={"code": "not_found", "message": "Receipt not found"},
         )
 
-    # Enforce RBAC/ownership
     _enforce_role_or_ownership(db, current_user, receipt)
     return _build_receipt_out(db, receipt)
 
@@ -271,6 +315,9 @@ def download_receipt_pdf(
 ):
     """
     Stream the PDF file for a given receipt_id.
+    RBAC:
+    - Admin/Clerk: all receipts
+    - Student/Parent: only receipts for invoices with their student_id
     """
 
     receipt = db.query(Receipt).filter(Receipt.id == receipt_id).first()
@@ -280,6 +327,7 @@ def download_receipt_pdf(
             detail={"code": "not_found", "message": "Receipt not found"},
         )
 
+    # Ownership / role guard
     _enforce_role_or_ownership(db, current_user, receipt)
 
     # Resolve the configured path (may expand ~ / env vars)

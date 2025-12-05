@@ -1,4 +1,4 @@
-# backend/app/ops/create_receipt.py
+# ops/create_receipt.py
 
 """
 CLI/Webhook op to render a persisted receipt’s PDF.
