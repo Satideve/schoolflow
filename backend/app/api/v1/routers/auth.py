@@ -1,15 +1,14 @@
 # backend/app/api/v1/routers/auth.py
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status, Request, Response
-from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials
+from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import logging
-from typing import List, Optional
+from typing import Optional
 
-# from app.schemas.user import UserCreate, UserOut, Token
 from app.schemas.user import UserCreate, UserOut
 from app.schemas.auth import Token
 from app.db.session import get_db
@@ -17,28 +16,25 @@ from app.models.user import User
 from app.core.config import settings
 from app.models.student import Student
 
-
 logger = logging.getLogger("app.auth")
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 # --- Custom BearerAuth to align OpenAPI spec with Swagger UI ---
-from fastapi.security import HTTPBearer
-
-
 class BearerAuth(HTTPBearer):
-    def __init__(self, auto_error: bool = True):
-        # allow callers to decide whether absence of header should auto-error
-        super().__init__(auto_error=auto_error)
+  def __init__(self, auto_error: bool = True):
+      # allow callers to decide whether absence of header should auto-error
+      super().__init__(auto_error=auto_error)
 
-    def openapi_scheme(self):
-        return {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-        }
+  def openapi_scheme(self):
+      return {
+          "type": "http",
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+      }
 
 
 # Use this for all protected endpoints.
@@ -199,10 +195,13 @@ def register_user(
     Public registration endpoint.
 
     Rules:
-    - Always creates a 'student' user (ignores incoming role to avoid elevation).
     - If student_id is provided:
         * Student must exist.
         * No other user may already be linked to this student_id.
+        * Role is always forced to "student".
+    - If student_id is NOT provided:
+        * Role is taken from payload.role when in {"admin","clerk","student"}.
+        * If role is missing/invalid, default to "admin" (for dev convenience).
     """
 
     # 1) Ensure email is unique
@@ -237,15 +236,28 @@ def register_user(
                 detail="This student already has a linked user account",
             )
 
-    # 3) Hash password and force safe role
+    # 3) Decide effective role
+    if student_id is not None:
+        # any user linked to a student is always a student account
+        effective_role = "student"
+    else:
+        requested = (payload.role or "").lower().strip()
+        if requested in {"admin", "clerk", "student"}:
+            effective_role = requested
+        else:
+            # fallback default when no valid role is provided: admin
+            effective_role = "admin"
+
+    # 4) Hash password
     hashed = get_password_hash(payload.password)
 
+    # 5) Create user
     user = User(
         email=payload.email,
         hashed_password=hashed,
-        role="student",        # force student for public registration
+        role=effective_role,
         is_active=True,
-        student_id=student_id, # may be None
+        student_id=student_id,  # may be None
     )
 
     db.add(user)
@@ -253,9 +265,6 @@ def register_user(
     db.refresh(user)
 
     return user
-
-
-logger = logging.getLogger("app.auth")
 
 
 @router.post("/login", response_model=Token)

@@ -7,6 +7,12 @@ Change summary (2025-11-09):
   1) canonical/tests-expect:   INV-{invoice_no}.pdf   (can be INV-INV-XYZ)
   2) friendly/alias (if invoice_no already has 'INV-'): INV-{invoice_no.lstrip('INV-')}.pdf (single INV-)
 - No behavior changes to DB logic; preserves all variable names and public methods.
+
+Change summary (2025-12-xx):
+- Treat the "amount" passed from the API as an *extra amount* (top-up) that is
+  added on top of the fee-plan/components total. If no extra amount is given,
+  the invoice total is just the plan-derived amount. Balance is then
+  total_due - sum(all payments).
 """
 
 from decimal import Decimal
@@ -121,14 +127,21 @@ class FeesService:
         student_id: int,
         invoice_no: str,
         period: str,
-        amount: Decimal,
+        amount: Decimal | None,
         due_date: datetime,
         payment: dict | None = None,
     ) -> FeeInvoice:
         """
         Idempotently generate a FeeInvoice record and render its PDF.
-        If an invoice with the same invoice_no exists, returns it and
-        regenerates PDF only if missing.
+
+        Semantics of "amount":
+        - Treated as an *extra amount* / top-up entered by the admin.
+        - The final amount_due stored on the invoice is:
+
+              amount_due = (plan/components total) + (extra amount or 0)
+
+        - If there are no plan/components, the invoice can still be created and
+          amount_due will be just the extra amount (or 0).
         """
         existing = get_invoice_by_no(self.db, invoice_no)
         invoices_dir = get_invoices_dir()
@@ -139,36 +152,53 @@ class FeesService:
             _render_invoice_pdf_both_names(existing.invoice_no, ctx_existing, invoices_dir)
             return existing
 
-        # 1) create invoice using the amount provided by the caller
+        # 1) Create invoice with an initial placeholder amount_due (0).
+        #    We'll recompute amount_due after we know the items_total.
+        placeholder_amount = Decimal("0")
         inv = create_invoice(
             self.db,
             student_id=student_id,
             invoice_no=invoice_no,
             period=period,
-            amount_due=amount,
+            amount_due=placeholder_amount,
             due_date=due_date,
         )
         self.db.commit()
         self.db.refresh(inv)
 
-        # 2) If caller passed amount 0/None, auto-fill from items_total (sum of plan components)
+        # 2) Compute base total from items (fee plan / components) and add extra amount.
         try:
             ctx_for_total = load_invoice_context(inv.id, self.db)
             items_total = ctx_for_total.get("items_total")
-            amount_was_blank = (amount is None) or (_decimal(amount) == Decimal("0"))
-            if amount_was_blank and items_total is not None:
-                inv.amount_due = _decimal(items_total)
-                self.db.commit()
-                self.db.refresh(inv)
-                logger.info(
-                    "Auto-filled amount_due from items_total=%.2f for invoice %s (id=%s)",
-                    float(items_total),
-                    invoice_no,
-                    inv.id,
-                )
+
+            base_total = _decimal(items_total) if items_total is not None else Decimal("0")
+            extra = _decimal(amount) if amount is not None else Decimal("0")
+
+            final_due = base_total + extra
+
+            inv.amount_due = final_due
+            self.db.commit()
+            self.db.refresh(inv)
+
+            logger.info(
+                "Computed amount_due=%.2f for invoice %s (id=%s) from base_total=%.2f + extra=%.2f",
+                float(final_due),
+                invoice_no,
+                inv.id,
+                float(base_total),
+                float(extra),
+            )
         except Exception as e:
-            # non-fatal; we still render with whatever is set
-            logger.warning("Could not auto-fill amount_due from items_total: %s", e)
+            # Non-fatal: if anything goes wrong, keep the placeholder (0 or extra).
+            logger.warning("Could not compute invoice amount_due from items_total/extra: %s", e)
+            # If amount was provided and we failed to load items_total, fall back to that.
+            try:
+                if amount is not None:
+                    inv.amount_due = _decimal(amount) or Decimal("0")
+                    self.db.commit()
+                    self.db.refresh(inv)
+            except Exception:
+                logger.exception("Fallback setting of amount_due from extra amount failed")
 
         # 3) Optional payment handling (idempotent with unique key)
         if payment:
