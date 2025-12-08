@@ -4,22 +4,23 @@
  *
  * - Core fields: invoice_no, student_id, period, due_date.
  * - Base amount_due field (optional).
- * - NEW: line items section where admin can enter extra charges.
+ * - Line items section where admin can enter extra charges.
  *
- * Backend still receives a single `amount_due` number, computed as:
- *   amount_due = (base amount_due field, default 0) + sum(line item amounts)
- *
- * This preserves all existing backend behaviour while giving the admin
- * a clean UI to enter per-item charges.
+ * Backend still receives:
+ *   - amount_due (base/top-up)
+ *   - line_items[] (per-item charges) for the invoice.
  */
 
 import React, { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useCreateInvoice } from "../api/queries";
+import {
+  useCreateInvoice,
+  useStudents,
+  useFeeAssignments,
+} from "../api/queries";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/use-toast";
 import type { InvoiceCreateDTO } from "../types/api";
-
 
 type FormValues = {
   invoice_no: string;
@@ -47,8 +48,13 @@ export default function CreateInvoice() {
   const nav = useNavigate();
   const toast = useToast();
 
+  const { data: studentsData } = useStudents();
+  const { data: assignmentsData } = useFeeAssignments();
+
+  // Watch the base amount field
   const baseAmountField = watch("amount_due") || "";
 
+  // Totals
   const itemsTotal = useMemo(() => {
     return items.reduce((sum, it) => {
       const n = Number(it.amount);
@@ -67,6 +73,24 @@ export default function CreateInvoice() {
   const grandTotal = useMemo(() => {
     return baseAmount + itemsTotal;
   }, [baseAmount, itemsTotal]);
+
+  // Build student → object map
+  const studentMap = useMemo(() => {
+    const map = new Map<number, any>();
+    (studentsData ?? []).forEach((s: any) => {
+      if (s?.id != null) map.set(Number(s.id), s);
+    });
+    return map;
+  }, [studentsData]);
+
+  // Build student → fee_assignment map
+  const assignmentMap = useMemo(() => {
+    const map = new Map<number, any>();
+    (assignmentsData ?? []).forEach((a: any) => {
+      if (a?.student_id != null) map.set(Number(a.student_id), a);
+    });
+    return map;
+  }, [assignmentsData]);
 
   const handleAddItem = () => {
     setItems((prev) => [...prev, { description: "", amount: "" }]);
@@ -93,12 +117,38 @@ export default function CreateInvoice() {
     );
   };
 
-   const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     try {
+      const studentId = Number(values.student_id);
+
+      // 1) Validate student ID is numeric
+      if (!studentId || Number.isNaN(studentId)) {
+        toast.push("Please enter a valid numeric student ID.");
+        return;
+      }
+
+      // 2) Check that the student exists
+      if (!studentMap.has(studentId)) {
+        toast.push(`Student ID ${studentId} does not exist.`);
+        return;
+      }
+
+      // 3) Check that the student has a fee assignment
+      if (!assignmentMap.has(studentId)) {
+        const student = studentMap.get(studentId);
+        const label = student?.name ?? `Student #${studentId}`;
+        toast.push(
+          `${label} has no fee plan assignment. Please assign a fee plan first.`,
+        );
+        // Redirect to Fee Assignments page
+        nav("/fee-assignments");
+        return;
+      }
+
       // base payload (without totals logic)
       const payload: InvoiceCreateDTO = {
         invoice_no: values.invoice_no,
-        student_id: Number(values.student_id),
+        student_id: studentId,
         period: values.period,
         due_date: values.due_date,
       };
@@ -124,10 +174,13 @@ export default function CreateInvoice() {
             amount: n,
           };
         })
-        .filter((it): it is { description: string; amount: number } => it !== null);
+        .filter(
+          (it): it is { description: string; amount: number } => it !== null,
+        );
 
       if (line_items.length > 0) {
-        payload.line_items = line_items;
+        // Cast to any to satisfy TS if InvoiceCreateDTO doesn't declare line_items
+        (payload as any).line_items = line_items;
       }
 
       const data = await create.mutateAsync(payload);
@@ -144,7 +197,6 @@ export default function CreateInvoice() {
 
       toast.push(`Create failed: ${message}`);
     }
-
   };
 
   return (
@@ -290,21 +342,15 @@ export default function CreateInvoice() {
           <div className="mt-2 text-sm text-gray-700 space-y-1">
             <div>
               Base amount:{" "}
-              <span className="font-semibold">
-                ₹{baseAmount.toFixed(2)}
-              </span>
+              <span className="font-semibold">₹{baseAmount.toFixed(2)}</span>
             </div>
             <div>
               Line items total:{" "}
-              <span className="font-semibold">
-                ₹{itemsTotal.toFixed(2)}
-              </span>
+              <span className="font-semibold">₹{itemsTotal.toFixed(2)}</span>
             </div>
             <div>
               <span className="font-semibold">Final invoice amount:</span>{" "}
-              <span className="font-bold">
-                ₹{grandTotal.toFixed(2)}
-              </span>
+              <span className="font-bold">₹{grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>

@@ -1,59 +1,67 @@
-﻿/* C:\coding_projects\dev\schoolflow\frontend\src\components\ui\use-toast.tsx */
+﻿// src/components/ui/use-toast.tsx
+
 import React, {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useEffect,
+  useState,
+  ReactNode,
 } from "react";
 import Toaster from "./toaster";
 
-type Toast = { id: string; message: string };
+export type ToastEntry = {
+  id: string;
+  message: string;
+};
 
 export type ToastContextValue = {
-  push: (msg: string) => void;
+  push: (message: string) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
-export const ToastProvider: React.FC<{ children?: React.ReactNode }> = ({
-  children,
-}) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastEntry[]>([]);
 
   const push = useCallback((message: string) => {
     const id = Math.random().toString(36).slice(2, 9);
-    const t: Toast = { id, message };
-    console.log("[ToastProvider] push called:", t); // DEBUG
-    setToasts((s) => [t, ...s]);
+
+    const entry: ToastEntry = { id, message };
+    console.log("[ToastProvider] push called:", entry);
+
+    setToasts((prev) => {
+      const next = [...prev, entry];
+      console.log("[ToastProvider] toasts state changed:", next);
+      return next;
+    });
+
+    // Auto-remove after 3 seconds
     setTimeout(() => {
-      setToasts((s) => s.filter((x) => x.id !== id));
-    }, 4000);
+      setToasts((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        console.log("[ToastProvider] toasts state changed:", next);
+        return next;
+      });
+    }, 3000);
   }, []);
 
   useEffect(() => {
-    console.log("[ToastProvider] toasts state changed:", toasts); // DEBUG
-  }, [toasts]);
+    console.log("[ToastProvider] mounted");
+  }, []);
 
   return (
     <ToastContext.Provider value={{ push }}>
       {children}
+
+      {/* Render all toast notifications */}
       <Toaster toasts={toasts} />
     </ToastContext.Provider>
   );
-};
-
-/**
- * Hook to access the toast context.
- * This is exported as a **named export** used across the app.
- */
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) {
-    console.error("useToast called outside ToastProvider"); // DEBUG
-    throw new Error("useToast must be used inside ToastProvider");
-  }
-  return ctx;
 }
 
-export default useToast;
+export function useToast(): ToastContextValue {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToast must be used within a ToastProvider");
+  return ctx;
+}
