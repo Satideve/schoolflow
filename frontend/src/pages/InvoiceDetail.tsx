@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useInvoice, useStudents } from "../api/queries";
+import { useInvoice, useStudents, useInvoiceLineItems } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 import { createPaymentOrder, CreatePaymentPayload } from "../api/payments";
 import PaymentDialog from "../components/PaymentDialog";
@@ -18,7 +18,9 @@ export default function InvoiceDetail() {
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useInvoice(id);
   const { data: students } = useStudents();
-  const { toast } = useToast();
+  const { data: invoiceLineItems } = useInvoiceLineItems(id ?? "");
+
+  const toast = useToast();
   const { user } = useAuth();
 
   const role = user?.role;
@@ -43,24 +45,16 @@ export default function InvoiceDetail() {
           exact: false,
         });
         setOpenPayment(false);
-        toast({
-          title: "Payment recorded",
-          description: "Invoice and receipts refreshed.",
-        });
+        
+       toast.push("Payment recorded: Invoice and receipts refreshed.");
+
       } catch {
-        toast({
-          title: "Payment recorded (partial)",
-          description: "Payment created but failed to refresh data.",
-          variant: "destructive",
-        });
+        toast.push("Payment recorded (partial): failed to refresh invoice/receipt list.");
+
       }
     },
     onError: () => {
-      toast({
-        title: "Payment failed",
-        description: "Failed to create payment.",
-        variant: "destructive",
-      });
+     toast.push("Payment failed: unable to create payment.");
     },
   });
 
@@ -83,9 +77,13 @@ export default function InvoiceDetail() {
     inv.student?.name ??
     `Student #${inv.student_id}`;
 
-  // Line items
+  // Line items:
+  // 1) Prefer stored invoice_items from the dedicated API
+  // 2) Fallback to whatever the invoice payload already has (for legacy cases)
   const items =
-    inv.items && inv.items.length > 0
+    Array.isArray(invoiceLineItems) && invoiceLineItems.length > 0
+      ? invoiceLineItems
+      : inv.items && inv.items.length > 0
       ? inv.items
       : inv.line_items && inv.line_items.length > 0
       ? inv.line_items
@@ -94,6 +92,7 @@ export default function InvoiceDetail() {
       : inv.fee_components && inv.fee_components.length > 0
       ? inv.fee_components
       : [];
+
 
   function itemTitle(it: any) {
     return (
@@ -282,7 +281,7 @@ export default function InvoiceDetail() {
         open={openPayment}
         onOpenChange={setOpenPayment}
         onSubmit={handlePaymentSubmit}
-        loading={paymentMutation.isLoading}
+        loading={paymentMutation.isPending}
       />
     </div>
   );

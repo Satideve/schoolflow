@@ -13,6 +13,12 @@ Change summary (2025-12-xx):
   added on top of the fee-plan/components total. If no extra amount is given,
   the invoice total is just the plan-derived amount. Balance is then
   total_due - sum(all payments).
+
+Change summary (2025-12-06):
+- Support explicit admin-entered line items (FeeInvoiceItem) on invoices.
+  These items are included in the invoice context and in items_total, and
+  amount_due is computed as:
+      amount_due = (plan/components + invoice_items total) + extra amount
 """
 
 from decimal import Decimal
@@ -33,6 +39,7 @@ from app.services.pdf.renderer import render_receipt_pdf, render_invoice_pdf
 from app.services.pdf.context_loader import load_receipt_context, load_invoice_context
 from app.services.messaging.interface import MessagingInterface
 from app.models.fee.fee_invoice import FeeInvoice
+from app.models.fee.fee_invoice_item import FeeInvoiceItem
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -130,6 +137,7 @@ class FeesService:
         amount: Decimal | None,
         due_date: datetime,
         payment: dict | None = None,
+        line_items: list[dict] | None = None,
     ) -> FeeInvoice:
         """
         Idempotently generate a FeeInvoice record and render its PDF.
@@ -138,10 +146,14 @@ class FeesService:
         - Treated as an *extra amount* / top-up entered by the admin.
         - The final amount_due stored on the invoice is:
 
-              amount_due = (plan/components total) + (extra amount or 0)
+              amount_due = (plan/components + invoice_items total) + (extra amount or 0)
 
-        - If there are no plan/components, the invoice can still be created and
-          amount_due will be just the extra amount (or 0).
+        - If there are no plan/components or invoice_items, the invoice can still be
+          created and amount_due will be just the extra amount (or 0).
+
+        line_items:
+        - Optional list of admin-entered line items (description + amount).
+        - These are persisted as FeeInvoiceItem and included in items_total.
         """
         existing = get_invoice_by_no(self.db, invoice_no)
         invoices_dir = get_invoices_dir()
@@ -166,7 +178,42 @@ class FeesService:
         self.db.commit()
         self.db.refresh(inv)
 
-        # 2) Compute base total from items (fee plan / components) and add extra amount.
+        # 1b) Persist explicit line items (if any) as FeeInvoiceItem
+        try:
+            if line_items:
+                for li in line_items:
+                    if not li:
+                        continue
+                    desc_raw = li.get("description")
+                    amt_raw = li.get("amount")
+
+                    # Skip items with no description
+                    if not desc_raw:
+                        continue
+
+                    desc = str(desc_raw).strip()
+                    if not desc:
+                        continue
+
+                    amt_dec = _decimal(amt_raw) or Decimal("0")
+
+                    item = FeeInvoiceItem(
+                        fee_invoice_id=inv.id,
+                        description=desc,
+                        amount=amt_dec,
+                    )
+                    self.db.add(item)
+
+                self.db.commit()
+        except Exception as e:
+            # Non-fatal: if line items fail to persist, continue with invoice only.
+            logger.warning("Failed to persist invoice line items for invoice %s: %s", invoice_no, e)
+            self.db.rollback()
+            # Re-attach/refresh invoice after rollback
+            inv = self.db.merge(inv)
+            self.db.refresh(inv)
+
+        # 2) Compute base total from items (fee plan / components + FeeInvoiceItem) and add extra amount.
         try:
             ctx_for_total = load_invoice_context(inv.id, self.db)
             items_total = ctx_for_total.get("items_total")

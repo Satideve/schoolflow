@@ -12,6 +12,7 @@ import {
   FeePlan,
   FeePlanComponent,
   FeeAssignment,
+  InvoiceLineItem, // NEW
 } from "../types/api";
 
 /* ------------------------------------------------------
@@ -182,6 +183,45 @@ export function useCreateFeeComponent() {
   });
 }
 
+/**
+ * Update an existing fee component.
+ */
+export function useUpdateFeeComponent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      name?: string;
+      description?: string | null;
+    }): Promise<FeeComponent> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/fee-components/${id}`, body);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-components"] });
+    },
+  });
+}
+
+/**
+ * Delete a fee component.
+ */
+export function useDeleteFeeComponent() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/fee-components/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-components"] });
+    },
+  });
+}
+
+
 /* ------------------------------------------------------
    FEE PLANS
 ------------------------------------------------------- */
@@ -224,6 +264,47 @@ export function useFeePlan(id?: number | string) {
       return data;
     },
     enabled: !!id,
+  });
+}
+
+/**
+ * Update an existing fee plan.
+ */
+export function useUpdateFeePlan() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      name?: string;
+      academic_year?: string;
+      frequency?: string;
+    }): Promise<FeePlan> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/fee-plans/${id}`, body);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      // Refresh list and detail for this plan
+      qc.invalidateQueries({ queryKey: ["fee-plans"] });
+      qc.invalidateQueries({ queryKey: ["fee-plan", variables.id] });
+    },
+  });
+}
+
+/**
+ * Delete a fee plan.
+ */
+export function useDeleteFeePlan() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<void> => {
+      await api.delete(`/api/v1/fee-plans/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-plans"] });
+    },
   });
 }
 
@@ -431,6 +512,102 @@ export function useCreateInvoice() {
       return data;
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+/* ------------------------------------------------------
+   INVOICE LINE ITEMS (fee_invoice_item)
+------------------------------------------------------- */
+
+/**
+ * Get all stored line items for a specific invoice.
+ */
+export function useInvoiceLineItems(invoiceId?: number | string) {
+  return useQuery({
+    queryKey: ["invoice-items", invoiceId],
+    queryFn: async (): Promise<InvoiceLineItem[]> => {
+      const { data } = await api.get(
+        `/api/v1/invoice-items/by-invoice/${invoiceId}`
+      );
+      return data;
+    },
+    enabled: !!invoiceId,
+  });
+}
+
+/**
+ * Create a new line item for an invoice.
+ */
+export function useCreateInvoiceLineItem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      fee_invoice_id: number;
+      description: string;
+      amount: number;
+    }): Promise<InvoiceLineItem> => {
+      const { data } = await api.post("/api/v1/invoice-items/", payload);
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate both the items list and the invoice itself
+      qc.invalidateQueries({
+        queryKey: ["invoice-items", variables.fee_invoice_id],
+      });
+      qc.invalidateQueries({ queryKey: ["invoice", variables.fee_invoice_id] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+/**
+ * Update an existing invoice line item.
+ */
+export function useUpdateInvoiceLineItem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      description?: string;
+      amount?: number;
+    }): Promise<InvoiceLineItem> => {
+      const { id, ...body } = payload;
+      const { data } = await api.patch(`/api/v1/invoice-items/${id}`, body);
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({
+        queryKey: ["invoice-items", data.fee_invoice_id],
+      });
+      qc.invalidateQueries({ queryKey: ["invoice", data.fee_invoice_id] });
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+    },
+  });
+}
+
+/**
+ * Delete an invoice line item.
+ */
+export function useDeleteInvoiceLineItem() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      id: number;
+      fee_invoice_id: number;
+    }): Promise<void> => {
+      const { id } = payload;
+      await api.delete(`/api/v1/invoice-items/${id}`);
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({
+        queryKey: ["invoice-items", variables.fee_invoice_id],
+      });
+      qc.invalidateQueries({ queryKey: ["invoice", variables.fee_invoice_id] });
       qc.invalidateQueries({ queryKey: ["invoices"] });
     },
   });

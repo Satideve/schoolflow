@@ -30,6 +30,7 @@ from app.models.fee.receipt import Receipt
 from app.models.fee.fee_invoice import FeeInvoice
 from app.models.fee.payment import Payment
 from app.models.student import Student
+from app.models.fee.fee_invoice_item import FeeInvoiceItem
 
 # Optional models (tolerate partial schemas)
 try:
@@ -43,6 +44,11 @@ try:
 except Exception:
     FeePlanComponent = None  # type: ignore
     FeeComponent = None  # type: ignore
+
+try:
+    from app.models.fee.fee_invoice_item import FeeInvoiceItem
+except Exception:
+    FeeInvoiceItem = None  # type: ignore
 
 
 # ----------------------------- helpers ---------------------------------
@@ -186,6 +192,27 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
 
     amount = _safe_float(getattr(invoice, "amount_due", None))
 
+    # 0) Explicit invoice items from FeeInvoiceItem (admin-entered line items)
+    invoice_items: List[Dict[str, Any]] = []
+    try:
+        rows = (
+            db.query(FeeInvoiceItem)
+            .filter(FeeInvoiceItem.fee_invoice_id == invoice.id)
+            .all()
+        )
+        for it in rows:
+            invoice_items.append(
+                {
+                    "id": getattr(it, "id", None),
+                    "description": getattr(it, "description", None),
+                    "amount": _safe_float(getattr(it, "amount", None)),
+                }
+            )
+    except Exception:
+        invoice_items = []
+
+    # 1) Try assignment-linked items (invoice -> student)
+
     # 1) Try assignment-linked items (invoice -> student)
     items: List[Dict[str, Any]] = []
     try:
@@ -271,6 +298,10 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
             items = []
     except Exception:
         pass
+
+    # 4) Append any explicit invoice items at the end (extras on top of plan/assignment items)
+    if invoice_items:
+        items = (items or []) + invoice_items
 
     # payments (best-effort)
     payments: List[Payment] = []

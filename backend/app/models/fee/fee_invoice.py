@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.base import Base
 
+
 class FeeInvoice(Base):
     __tablename__ = "fee_invoice"
 
@@ -16,15 +17,26 @@ class FeeInvoice(Base):
     status = Column(String(32), nullable=False, default="pending")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
-    # relationship back to student (if not present elsewhere)
+    # relationship back to student
     student = relationship("Student", back_populates="invoices")
 
-    # NEW: relationship to FeeAssignment; matches FeeAssignment.invoice back_populates="assignments"
+    # relationship to FeeAssignment; matches FeeAssignment.invoice back_populates="assignments"
     assignments = relationship(
         "FeeAssignment",
         back_populates="invoice",
         cascade="all, delete-orphan",
     )
 
-    # optional convenience relationships (payments / receipts may be defined elsewhere)
-    payments = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan")
+    # payments relationship
+    payments = relationship(
+        "Payment",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )
+
+    # NEW: line items relationship
+    items = relationship(
+        "FeeInvoiceItem",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )

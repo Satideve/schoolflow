@@ -7,3 +7,4 @@ from .fee_assignment import FeeAssignment
 from .fee_invoice import FeeInvoice
 from .payment import Payment
 from .receipt import Receipt
+from .fee_invoice_item import FeeInvoiceItem

@@ -20,6 +20,7 @@ import ClassSections from "./pages/ClassSections";
 import Students from "./pages/Students";
 import FeeComponents from "./pages/FeeComponents";
 import FeePlans from "./pages/FeePlans";
+import FeePlanDetail from "./pages/FeePlanDetail";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./store/auth";
 
@@ -209,6 +210,17 @@ export default function App() {
           </RouteGuard>
         }
       />
+
+      {/* fee-plan-components */}  
+      <Route
+        path="/fee-plans/:id"
+        element={
+          <AdminRoute>
+            <FeePlanDetail />
+          </AdminRoute>
+        }
+      />
+
 
       {/* Student/parent pages */}
       <Route

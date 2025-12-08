@@ -3,11 +3,12 @@
  * Receipts list page (admin / accountant view)
  */
 
-import React, { useMemo } from "react";
+import React from "react";
 import { useReceipts, useInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 
 export default function ReceiptsList() {
+  // 1) Always call hooks at the top, in a fixed order
   const {
     data: receiptsData,
     isLoading: loadingReceipts,
@@ -17,6 +18,7 @@ export default function ReceiptsList() {
   const { data: invoicesData } = useInvoices();
   const { data: studentsData } = useStudents();
 
+  // 2) Simple loading / error states
   if (loadingReceipts) {
     return <div>Loading receipts...</div>;
   }
@@ -25,6 +27,7 @@ export default function ReceiptsList() {
     return <div className="text-red-600">Failed to load receipts.</div>;
   }
 
+  // 3) Normalize data shapes
   const receipts = Array.isArray(receiptsData)
     ? receiptsData
     : (receiptsData?.results ?? receiptsData ?? []);
@@ -40,46 +43,42 @@ export default function ReceiptsList() {
   const invoices = Array.isArray(invoicesData)
     ? invoicesData
     : (invoicesData ?? []);
+
   const students = Array.isArray(studentsData)
     ? studentsData
     : (studentsData ?? []);
 
-  const invoiceById = useMemo(() => {
-    const map = new Map<number, any>();
-    invoices.forEach((inv: any) => {
-      if (inv && typeof inv.id === "number") {
-        map.set(inv.id, inv);
-      }
-    });
-    return map;
-  }, [invoices]);
+  // 4) Build lookup maps without useMemo (no extra hooks, no risk)
+  const invoiceById = new Map<number, any>();
+  invoices.forEach((inv: any) => {
+    if (inv && typeof inv.id === "number") {
+      invoiceById.set(inv.id, inv);
+    }
+  });
 
-  const studentById = useMemo(() => {
-    const map = new Map<number, any>();
-    students.forEach((s: any) => {
-      if (s && typeof s.id === "number") {
-        map.set(s.id, s);
-      }
-    });
-    return map;
-  }, [students]);
+  const studentById = new Map<number, any>();
+  students.forEach((s: any) => {
+    if (s && typeof s.id === "number") {
+      studentById.set(s.id, s);
+    }
+  });
 
-  const findStudentNameForReceipt = (r: any): string => {
+  function findStudentNameForReceipt(r: any): string {
     if (!r || r.invoice_id == null) return "-";
     const inv = invoiceById.get(r.invoice_id);
     if (!inv || inv.student_id == null) return `Invoice #${r.invoice_id}`;
     const student = studentById.get(inv.student_id);
     return student?.name ?? `Student #${inv.student_id}`;
-  };
+  }
 
-  const formatDateTime = (value?: string | null) => {
+  function formatDateTime(value?: string | null) {
     if (!value) return "-";
     try {
       return new Date(value).toLocaleString();
     } catch {
       return String(value);
     }
-  };
+  }
 
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
@@ -107,9 +106,7 @@ export default function ReceiptsList() {
                 <td className="p-2">{r.invoice_id ?? "-"}</td>
                 <td className="p-2">{findStudentNameForReceipt(r)}</td>
                 <td className="p-2 text-right">
-                  {formatMoney(
-                    Number(r.amount != null ? r.amount : 0) || 0
-                  )}
+                  {formatMoney(Number(r.amount != null ? r.amount : 0) || 0)}
                 </td>
                 <td className="p-2">{formatDateTime(r.created_at)}</td>
                 <td className="p-2">

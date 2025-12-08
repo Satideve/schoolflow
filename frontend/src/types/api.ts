@@ -58,6 +58,18 @@ export type FeePlanComponent = {
   fee_component?: FeeComponent | null;
 };
 
+/**
+ * One stored line item for a specific invoice.
+ * Matches backend InvoiceLineItemOut (fee_invoice_item table).
+ */
+export type InvoiceLineItem = {
+  id: number;
+  fee_invoice_id: number;
+  description: string;
+  amount: number;
+  created_at?: string | null;
+};
+
 export type InvoiceItem = {
   title: string;
   description?: string | null;
@@ -85,7 +97,14 @@ export type InvoiceCreateDTO = {
   period: string;
   due_date: string;
   amount_due?: number | null;
+
+  // NEW: admin-entered line items (matches backend InvoiceItemCreate)
+  line_items?: {
+    description: string;
+    amount: number;
+  }[];
 };
+
 
 export type Receipt = {
   id: number;

@@ -14,7 +14,12 @@ from app.db.session import get_db
 from app.models.fee.fee_invoice import FeeInvoice
 from app.models.user import User
 from app.models.student import Student
-from app.schemas.fee.invoice import InvoiceCreate, InvoiceOut
+from app.schemas.fee.invoice import (
+    InvoiceCreate,
+    InvoiceOut,
+    InvoiceItemCreate,
+)
+
 from app.services.fee.fees_service import FeesService
 from app.services.payments.fake_adapter import FakePaymentAdapter
 from app.services.messaging.fake_adapter import FakeMessagingAdapter
@@ -30,16 +35,45 @@ from app.services.pdf.context_loader import load_invoice_context
 # Renderer for PDFs
 from app.services.pdf.renderer import render_invoice_pdf
 
+from decimal import Decimal
+from typing import Optional
+from pydantic import BaseModel
+
+from app.models.fee.fee_invoice_item import FeeInvoiceItem
+
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
 logger = logging.getLogger("app.audit.invoices")
+
 
 
 def _invoice_out_with_context(inv: FeeInvoice, db: Session) -> InvoiceOut:
     """
     Build InvoiceOut from ORM + merge PDF context values for parity with rendered PDFs.
-    Non-invasive: if keys are missing in context, we leave them as None.
+
+    IMPORTANT:
+    - We avoid Pydantic's from_orm here because it tries to lazy-load relationships
+      (e.g. FeeInvoice.items), which can cause DetachedInstanceError when the
+      instance is not bound to a live Session.
+    - Instead we construct the base payload manually from scalar fields only,
+      then merge in context-derived fields (items_total, total_due, etc.).
     """
-    base = InvoiceOut.from_orm(inv)
+    base = InvoiceOut(
+        id=inv.id,
+        student_id=inv.student_id,
+        invoice_no=inv.invoice_no,
+        period=getattr(inv, "period", None),
+        due_date=getattr(inv, "due_date", None),
+        amount_due=getattr(inv, "amount_due", None),
+        payment=None,  # not stored on the ORM; only used as input
+        status=getattr(inv, "status", "pending"),
+        created_at=getattr(inv, "created_at", None),
+        items_total=None,
+        total_due=None,
+        paid_amount=None,
+        balance=None,
+        items=None,
+    )
+
     try:
         ctx = load_invoice_context(inv.id, db)
         merged = base.model_dump()
@@ -48,7 +82,38 @@ def _invoice_out_with_context(inv: FeeInvoice, db: Session) -> InvoiceOut:
                 merged[k] = ctx.get(k)
         return InvoiceOut(**merged)
     except Exception:
+        # If context loading fails for any reason, fall back to base fields only.
         return base
+
+# ---- Invoice item DTOs & helpers (admin line items) -------------------------
+
+
+class InvoiceItemOut(BaseModel):
+    id: int
+    description: str
+    amount: Decimal
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceItemUpdate(BaseModel):
+    description: Optional[str] = None
+    amount: Optional[Decimal] = None
+
+
+def _to_decimal(v) -> Decimal:
+    """Safe Decimal conversion for numeric DB values."""
+    if v is None:
+        return Decimal("0")
+    try:
+        return Decimal(v)  # already Decimal / numeric
+    except Exception:
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return Decimal("0")
+
 
 
 @router.post(
@@ -117,6 +182,7 @@ def create_invoice(
             amount=payload.amount_due,
             due_date=due_date,
             payment=payload.payment,
+            line_items=[li.model_dump() for li in (payload.line_items or [])],
         )
         db.commit()
         db.refresh(inv)
@@ -311,3 +377,185 @@ def download_invoice(
         media_type="application/pdf",
         filename=filename,
     )
+
+# ---------------------------------------------------------------------------
+#                ADMIN: INVOICE LINE-ITEM CRUD (fee_invoice_item)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/{invoice_id}/items",
+    response_model=List[InvoiceItemOut],
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles("admin", "clerk"))],
+)
+def list_invoice_items(
+    invoice_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List manual line items for a given invoice (fee_invoice_item rows).
+    Only admin / clerk.
+    """
+    inv = repo_get_invoice(db, invoice_id)
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    items = (
+        db.query(FeeInvoiceItem)
+        .filter(FeeInvoiceItem.fee_invoice_id == invoice_id)
+        .order_by(FeeInvoiceItem.id.asc())
+        .all()
+    )
+    return items
+
+
+@router.post(
+    "/{invoice_id}/items",
+    response_model=InvoiceItemOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles("admin", "clerk"))],
+)
+def create_invoice_item(
+    invoice_id: int,
+    payload: InvoiceItemCreate,  # from app.schemas.fee.invoice
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Add a new manual line item to an invoice and bump amount_due by item amount.
+    """
+    inv = repo_get_invoice(db, invoice_id)
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    item = FeeInvoiceItem(
+        fee_invoice_id=invoice_id,
+        description=payload.description,
+        amount=payload.amount,
+    )
+    db.add(item)
+
+    # Adjust invoice.amount_due by the item amount
+    current_due = _to_decimal(inv.amount_due)
+    inv.amount_due = current_due + _to_decimal(payload.amount)
+
+    db.commit()
+    db.refresh(item)
+    db.refresh(inv)
+    return item
+
+
+@router.patch(
+    "/{invoice_id}/items/{item_id}",
+    response_model=InvoiceItemOut,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles("admin", "clerk"))],
+)
+def update_invoice_item(
+    invoice_id: int,
+    item_id: int,
+    payload: InvoiceItemUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update an existing manual line item (description/amount) and adjust amount_due by delta.
+    """
+    inv = repo_get_invoice(db, invoice_id)
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    item = (
+        db.query(FeeInvoiceItem)
+        .filter(
+            FeeInvoiceItem.id == item_id,
+            FeeInvoiceItem.fee_invoice_id == invoice_id,
+        )
+        .one_or_none()
+    )
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice item not found",
+        )
+
+    # Track old amount for delta
+    old_amount = _to_decimal(item.amount)
+    new_amount = old_amount
+
+    if payload.description is not None:
+        item.description = payload.description
+
+    if payload.amount is not None:
+        new_amount = _to_decimal(payload.amount)
+        item.amount = new_amount
+
+    # Adjust invoice.amount_due by delta (new - old)
+    delta = new_amount - old_amount
+    if delta != 0:
+        inv.amount_due = _to_decimal(inv.amount_due) + delta
+
+    db.commit()
+    db.refresh(item)
+    db.refresh(inv)
+    return item
+
+
+@router.delete(
+    "/{invoice_id}/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles("admin", "clerk"))],
+)
+def delete_invoice_item(
+    invoice_id: int,
+    item_id: int,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a manual line item and reduce invoice.amount_due by that amount.
+    """
+    inv = repo_get_invoice(db, invoice_id)
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    item = (
+        db.query(FeeInvoiceItem)
+        .filter(
+            FeeInvoiceItem.id == item_id,
+            FeeInvoiceItem.fee_invoice_id == invoice_id,
+        )
+        .one_or_none()
+    )
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice item not found",
+        )
+
+    old_amount = _to_decimal(item.amount)
+
+    # Reduce amount_due by the item amount
+    inv.amount_due = _to_decimal(inv.amount_due) - old_amount
+
+    db.delete(item)
+    db.commit()
+    # 204: no content
+    return None

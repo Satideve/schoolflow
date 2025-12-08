@@ -2,7 +2,12 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
-import { useFeePlans, useCreateFeePlan } from "../api/queries";
+import {
+  useFeePlans,
+  useCreateFeePlan,
+  useUpdateFeePlan,
+  useDeleteFeePlan,
+} from "../api/queries";
 import { useToast } from "../components/ui/use-toast";
 
 type FormValues = {
@@ -14,6 +19,9 @@ type FormValues = {
 export default function FeePlans() {
   const { data, isLoading, isError } = useFeePlans();
   const createMutation = useCreateFeePlan();
+  const updateMutation = useUpdateFeePlan();
+  const deleteMutation = useDeleteFeePlan();
+
   const { register, handleSubmit, reset } = useForm<FormValues>({
     defaultValues: {
       frequency: "monthly",
@@ -22,6 +30,12 @@ export default function FeePlans() {
   const toast = useToast();
 
   const plans = Array.isArray(data) ? data : data ?? [];
+
+  // Inline edit state
+  const [editingId, setEditingId] = React.useState<number | null>(null);
+  const [editingName, setEditingName] = React.useState<string>("");
+  const [editingYear, setEditingYear] = React.useState<string>("");
+  const [editingFrequency, setEditingFrequency] = React.useState<string>("");
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -46,10 +60,85 @@ export default function FeePlans() {
     }
   };
 
+  const startEditing = (p: any) => {
+    setEditingId(p.id);
+    setEditingName(p.name ?? "");
+    setEditingYear(p.academic_year ?? "");
+    setEditingFrequency(p.frequency ?? "monthly");
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingName("");
+    setEditingYear("");
+    setEditingFrequency("monthly");
+  };
+
+  const saveEdit = async (id: number) => {
+    const name = editingName.trim();
+    const academic_year = editingYear.trim();
+    const frequency = editingFrequency || "monthly";
+
+    if (!name || !academic_year) {
+      try {
+        toast.push("Name and academic year are required.");
+      } catch {
+        console.log("Name and academic year are required.");
+      }
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        id,
+        name,
+        academic_year,
+        frequency,
+      });
+      cancelEditing();
+      try {
+        toast.push("Fee plan updated.");
+      } catch {
+        console.log("Fee plan updated.");
+      }
+    } catch (err) {
+      console.error("update fee plan failed", err);
+      try {
+        toast.push("Failed to update fee plan.");
+      } catch {
+        console.log("Failed to update fee plan.");
+      }
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this fee plan? This will not delete existing invoices."
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteMutation.mutateAsync(id);
+      try {
+        toast.push("Fee plan deleted.");
+      } catch {
+        console.log("Fee plan deleted.");
+      }
+    } catch (err) {
+      console.error("delete fee plan failed", err);
+      try {
+        toast.push("Failed to delete fee plan.");
+      } catch {
+        console.log("Failed to delete fee plan.");
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Fee Plans</h1>
 
+      {/* Create form */}
       <div className="bg-white rounded shadow p-4">
         <h2 className="text-lg font-semibold mb-3">Add Fee Plan</h2>
         <form
@@ -84,6 +173,7 @@ export default function FeePlans() {
         </form>
       </div>
 
+      {/* List + edit/delete */}
       <div className="bg-white rounded shadow p-4">
         <h2 className="text-lg font-semibold mb-3">Existing Plans</h2>
         {isLoading ? (
@@ -101,24 +191,106 @@ export default function FeePlans() {
                   <th className="p-2 text-left">Name</th>
                   <th className="p-2 text-left">Academic Year</th>
                   <th className="p-2 text-left">Frequency</th>
+                  <th className="p-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {plans.map((p: any) => (
-                  <tr key={p.id} className="border-t">
-                    <td className="p-2">{p.id}</td>
-                    <td className="p-2">
-                      <Link
-                        to={`/fee-plans/${p.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {p.name}
-                      </Link>
-                    </td>
-                    <td className="p-2">{p.academic_year}</td>
-                    <td className="p-2">{p.frequency}</td>
-                  </tr>
-                ))}
+                {plans.map((p: any) => {
+                  const isEditing = editingId === p.id;
+                  return (
+                    <tr key={p.id} className="border-t">
+                      <td className="p-2">{p.id}</td>
+                      <td className="p-2">
+                        {isEditing ? (
+                          <input
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                          />
+                        ) : (
+                          <Link
+                            to={`/fee-plans/${p.id}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {p.name}
+                          </Link>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {isEditing ? (
+                          <input
+                            value={editingYear}
+                            onChange={(e) => setEditingYear(e.target.value)}
+                            className="border rounded px-2 py-1 text-sm w-full"
+                          />
+                        ) : (
+                          p.academic_year
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {isEditing ? (
+                          <select
+                            value={editingFrequency}
+                            onChange={(e) =>
+                              setEditingFrequency(e.target.value)
+                            }
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="monthly">Monthly</option>
+                            <option value="termly">Termly</option>
+                            <option value="yearly">Yearly</option>
+                          </select>
+                        ) : (
+                          p.frequency
+                        )}
+                      </td>
+                      <td className="p-2 text-right space-x-2">
+                        {isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => saveEdit(p.id)}
+                              disabled={(updateMutation as any).isPending}
+                              className="px-3 py-1 rounded bg-green-600 text-white text-xs disabled:opacity-60"
+                            >
+                              {(updateMutation as any).isPending
+                                ? "Saving..."
+                                : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditing}
+                              disabled={(updateMutation as any).isPending}
+                              className="px-3 py-1 rounded bg-slate-200 text-slate-800 text-xs disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditing(p)}
+                              className="px-3 py-1 rounded bg-slate-200 text-slate-800 text-xs"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(p.id)}
+                              disabled={(deleteMutation as any).isPending}
+                              className="px-3 py-1 rounded bg-red-600 text-white text-xs disabled:opacity-60"
+                            >
+                              {(deleteMutation as any).isPending
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
