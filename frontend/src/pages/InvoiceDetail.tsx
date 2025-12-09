@@ -78,21 +78,14 @@ export default function InvoiceDetail() {
     `Student #${inv.student_id}`;
 
   // Line items:
-  // 1) Prefer stored invoice_items from the dedicated API
-  // 2) Fallback to whatever the invoice payload already has (for legacy cases)
+  // Line items: use the combined items from the invoice payload
+  // Backend already merges plan-based components + extra manual items into inv.items
   const items =
-    Array.isArray(invoiceLineItems) && invoiceLineItems.length > 0
-      ? invoiceLineItems
-      : inv.items && inv.items.length > 0
+    inv.items && Array.isArray(inv.items) && inv.items.length > 0
       ? inv.items
-      : inv.line_items && inv.line_items.length > 0
+      : inv.line_items && Array.isArray(inv.line_items) && inv.line_items.length > 0
       ? inv.line_items
-      : inv.components && inv.components.length > 0
-      ? inv.components
-      : inv.fee_components && inv.fee_components.length > 0
-      ? inv.fee_components
       : [];
-
 
   function itemTitle(it: any) {
     return (

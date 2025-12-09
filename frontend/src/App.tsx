@@ -210,17 +210,20 @@ export default function App() {
           </RouteGuard>
         }
       />
-
-      {/* fee-plan-components */}  
+   
+      {/* Admin-only: Fee Plan Detail (components) */}
       <Route
         path="/fee-plans/:id"
         element={
-          <AdminRoute>
-            <FeePlanDetail />
-          </AdminRoute>
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <FeePlanDetail />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
         }
       />
-
 
       {/* Student/parent pages */}
       <Route
