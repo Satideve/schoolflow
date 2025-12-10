@@ -30,7 +30,11 @@ export type Student = {
   name?: string;
   roll_number?: string;
   class_section_id?: number;
+
+  // NEW: email of the linked portal user (null if no linked account exists)
+  portal_user_email?: string | null;
 };
+
 
 export type FeeComponent = {
   id: number;

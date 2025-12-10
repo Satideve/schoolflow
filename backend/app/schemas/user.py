@@ -17,6 +17,14 @@ class UserCreate(BaseModel):
     # Optional mapping to a student
     student_id: Optional[int] = None
 
+class StudentPortalUserCreate(BaseModel):
+    """
+    Payload used when an admin creates a portal user account
+    for an existing Student record.
+    """
+    email: EmailStr
+    password: str
+
 
 class UserOut(BaseModel):
     id: int

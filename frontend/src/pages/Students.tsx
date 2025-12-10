@@ -6,6 +6,7 @@ import {
   useCreateStudent,
   useUpdateStudent,
   useDeleteStudent,
+  useRegisterPortalUser,
 } from "../api/queries";
 import { useForm } from "react-hook-form";
 import { useToast } from "../components/ui/use-toast";
@@ -22,6 +23,7 @@ export default function Students() {
   const createMutation = useCreateStudent();
   const updateMutation = useUpdateStudent();
   const deleteMutation = useDeleteStudent();
+  const registerPortalUser = useRegisterPortalUser();
   const { register, handleSubmit, reset } = useForm<FormValues>();
   const toast = useToast();
 
@@ -33,6 +35,12 @@ export default function Students() {
   const [editName, setEditName] = React.useState<string>("");
   const [editRoll, setEditRoll] = React.useState<string>("");
   const [editSectionId, setEditSectionId] = React.useState<string>("");
+
+  // Local state for portal user creation modal
+  const [portalModalOpen, setPortalModalOpen] = React.useState(false);
+  const [portalStudent, setPortalStudent] = React.useState<any>(null);
+  const [portalEmail, setPortalEmail] = React.useState("");
+  const [portalPassword, setPortalPassword] = React.useState("");
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -161,6 +169,67 @@ export default function Students() {
     }
   };
 
+  // Start portal user creation for a given student
+  const startPortalUserCreate = (st: any) => {
+    setPortalStudent(st);
+    setPortalEmail(st.portal_user_email ?? ""); // usually empty, but safe
+    setPortalPassword("");
+    setPortalModalOpen(true);
+  };
+
+  // Handle actual portal user creation
+  const handleCreatePortalUser = async () => {
+    if (!portalStudent) return;
+
+    const email = portalEmail.trim();
+    const pwd = portalPassword.trim();
+
+    if (!email || !pwd) {
+      try {
+        toast.push("Email and password are required.");
+      } catch {
+        console.log("Email and password are required.");
+      }
+      return;
+    }
+
+    try {
+      await registerPortalUser.mutateAsync({
+        email,
+        password: pwd,
+        student_id: portalStudent.id,
+      });
+      try {
+        toast.push("Portal user created.");
+      } catch {
+        console.log("Portal user created.");
+      }
+      setPortalModalOpen(false);
+      setPortalStudent(null);
+      setPortalEmail("");
+      setPortalPassword("");
+    } catch (err: any) {
+      console.error("create portal user failed", err);
+      let msg = "Failed to create portal user.";
+      const maybeResponse: any = err?.response;
+      if (maybeResponse?.data?.detail) {
+        if (typeof maybeResponse.data.detail === "string") {
+          msg = maybeResponse.data.detail;
+        } else if (typeof maybeResponse.data.detail === "object") {
+          msg =
+            maybeResponse.data.detail.message ||
+            maybeResponse.data.detail.code ||
+            msg;
+        }
+      }
+      try {
+        toast.push(msg);
+      } catch {
+        console.log(msg);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Students</h1>
@@ -240,6 +309,7 @@ export default function Students() {
                   <th className="p-2 text-left">Name</th>
                   <th className="p-2 text-left">Roll Number</th>
                   <th className="p-2 text-left">Class Section</th>
+                  <th className="p-2 text-left">Portal Account</th>
                   <th className="p-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -287,6 +357,26 @@ export default function Students() {
                           </select>
                         ) : (
                           sectionLabel(st.class_section_id)
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {st.portal_user_email ? (
+                          <span className="inline-flex items-center rounded-full border border-green-100 bg-green-50 px-2 py-0.5 text-xs text-green-700">
+                            {st.portal_user_email}
+                          </span>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
+                              Not linked
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startPortalUserCreate(st)}
+                              className="text-xs text-blue-600 hover:underline mt-1 text-left"
+                            >
+                              Create Portal User
+                            </button>
+                          </div>
                         )}
                       </td>
                       <td className="p-2 text-right space-x-2">
@@ -341,6 +431,56 @@ export default function Students() {
           </div>
         )}
       </div>
+
+      {/* Portal user creation modal */}
+      {portalModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow p-6 w-80 space-y-3">
+            <h3 className="text-lg font-semibold">Create Portal User</h3>
+
+            <p className="text-sm text-slate-600">
+              Student: {portalStudent?.name} ({portalStudent?.roll_number})
+            </p>
+
+            <input
+              className="border rounded px-3 py-2 text-sm w-full"
+              placeholder="Email"
+              value={portalEmail}
+              onChange={(e) => setPortalEmail(e.target.value)}
+            />
+
+            <input
+              className="border rounded px-3 py-2 text-sm w-full"
+              placeholder="Password"
+              type="password"
+              value={portalPassword}
+              onChange={(e) => setPortalPassword(e.target.value)}
+            />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                className="px-3 py-1.5 rounded bg-slate-300 text-slate-800 text-sm"
+                onClick={() => {
+                  setPortalModalOpen(false);
+                  setPortalStudent(null);
+                  setPortalEmail("");
+                  setPortalPassword("");
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
+                onClick={handleCreatePortalUser}
+                disabled={(registerPortalUser as any).isPending}
+              >
+                {(registerPortalUser as any).isPending ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -625,3 +625,25 @@ export function useReceipts() {
     },
   });
 }
+
+/* ------------------------------------------------------
+   CREATE PORTAL USER (student-linked user)
+------------------------------------------------------- */
+export function useRegisterPortalUser() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: {
+      email: string;
+      password: string;
+      student_id: number;
+    }) => {
+      const { data } = await api.post("/api/v1/auth/register", payload);
+      return data;
+    },
+    onSuccess: () => {
+      // Refresh student list so portal_user_email appears
+      qc.invalidateQueries({ queryKey: ["students"] });
+    },
+  });
+}

@@ -20,6 +20,7 @@ class StudentUpdate(BaseModel):
 
 class StudentOut(StudentCreate):
     id: int
+    portal_user_email: Optional[str] = None  # NEW: linked portal user (if any)
 
     class Config:
         from_attributes = True
