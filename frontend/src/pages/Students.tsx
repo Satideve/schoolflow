@@ -172,7 +172,8 @@ export default function Students() {
   // Start portal user creation for a given student
   const startPortalUserCreate = (st: any) => {
     setPortalStudent(st);
-    setPortalEmail(st.portal_user_email ?? ""); // usually empty, but safe
+    // Always start with blank fields (no reuse of previous values)
+    setPortalEmail("");
     setPortalPassword("");
     setPortalModalOpen(true);
   };
@@ -447,6 +448,8 @@ export default function Students() {
               placeholder="Email"
               value={portalEmail}
               onChange={(e) => setPortalEmail(e.target.value)}
+              autoComplete="off"
+              name="portal_user_email"
             />
 
             <input
@@ -455,7 +458,10 @@ export default function Students() {
               type="password"
               value={portalPassword}
               onChange={(e) => setPortalPassword(e.target.value)}
+              autoComplete="new-password"
+              name="portal_user_password"
             />
+
 
             <div className="flex justify-end gap-2 pt-2">
               <button

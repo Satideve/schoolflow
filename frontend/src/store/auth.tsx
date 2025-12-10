@@ -13,6 +13,32 @@ type AuthContext = {
 const AuthCtx = createContext<AuthContext | undefined>(undefined);
 
 /**
+ * Safe helpers around sessionStorage (so we don't explode in non-browser
+ * environments or tests).
+ */
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem("sf_token");
+  } catch {
+    return null;
+  }
+}
+
+function setStoredToken(token: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) {
+      window.sessionStorage.setItem("sf_token", token);
+    } else {
+      window.sessionStorage.removeItem("sf_token");
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Decode a JWT payload (very small helper, no external libs).
  * Returns the parsed JSON payload or null if decoding fails.
  */
@@ -38,16 +64,14 @@ function decodeJwtPayload(token: string): any | null {
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [token, setTokenState] = useState<string | null>(() =>
-    localStorage.getItem("sf_token"),
-  );
+  const [token, setTokenState] = useState<string | null>(() => getStoredToken());
   const [user, setUser] = useState<any | null>(null);
 
   useEffect(() => {
     if (token) {
       setAuthToken(token);
-      localStorage.setItem("sf_token", token);
-      console.debug("[Auth] token set (persisted)");
+      setStoredToken(token);
+      console.debug("[Auth] token set (session-only)");
 
       // 1) Decode token as quick fallback
       const payload = decodeJwtPayload(token);
@@ -71,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       (async () => {
         try {
           const { data } = await api.get("/api/v1/auth/me");
-          // Expecting: { id, email, role, is_active }
+          // Expecting: { id, email, role, is_active, student_id? }
           setUser((prev: any) => ({
             ...prev,
             ...data,
@@ -84,7 +108,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       })();
     } else {
       setAuthToken(undefined);
-      localStorage.removeItem("sf_token");
+      setStoredToken(null);
       setUser(null);
       console.debug("[Auth] token cleared");
     }
