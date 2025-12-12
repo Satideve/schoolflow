@@ -1,20 +1,13 @@
-// C:\coding_projects\dev\schoolflow\frontend\tailwind.config.cjs
-/** @type {import('tailwindcss').Config} */
-const typography = require("@tailwindcss/typography");
+﻿// C:\coding_projects\dev\schoolflow\frontend\tailwind.config.ts
+import type { Config } from "tailwindcss";
+import typography from "@tailwindcss/typography";
 
-module.exports = {
-  // keep class-based dark mode (explicit)
+const config: Config = {
   darkMode: "class",
-
-  content: [
-    "./index.html",
-    "./src/**/*.{js,jsx,ts,tsx,html}",
-  ],
-
+  content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx,html}"],
   theme: {
     extend: {
-      // small, safe typography tweaks so `prose` looks good with your palette
-      typography: (theme) => ({
+      typography: (theme: any) => ({
         DEFAULT: {
           css: {
             color: theme("colors.slate.900"),
@@ -54,6 +47,7 @@ module.exports = {
       }),
     },
   },
-
   plugins: [typography],
 };
+
+export default config;

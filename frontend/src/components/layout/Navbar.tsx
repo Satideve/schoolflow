@@ -114,6 +114,12 @@ export default function Navbar() {
                 <Link to="/admin/csv" className="text-sm text-slate-700 hover:text-black">
                   CSV Import
                 </Link>
+                <Link
+                  to="/help/admin"
+                  className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 whitespace-nowrap transition"
+                >
+                  Help
+                </Link>
               </>
             ) : (
               <>
@@ -122,6 +128,12 @@ export default function Navbar() {
                 </Link>
                 <Link to="/my/receipts" className="text-sm text-slate-700 hover:text-black">
                   My Receipts
+                </Link>
+                <Link
+                  to="/help/student"
+                  className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 whitespace-nowrap transition"
+                >
+                  Help
                 </Link>
               </>
             )}

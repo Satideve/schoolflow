@@ -22,6 +22,9 @@ import FeeComponents from "./pages/FeeComponents";
 import FeePlans from "./pages/FeePlans";
 import FeePlanDetail from "./pages/FeePlanDetail";
 import NotFound from "./pages/NotFound";
+import HelpAdmin from "./pages/HelpAdmin";
+import HelpStudent from "./pages/HelpStudent";
+
 import { useAuth } from "./store/auth";
 
 /**
@@ -225,6 +228,20 @@ export default function App() {
         }
       />
 
+      {/* Admin help (admin-like users only) */}
+      <Route
+        path="/help/admin"
+        element={
+          <RouteGuard>
+            <Shell>
+              <AdminRoute>
+                <HelpAdmin />
+              </AdminRoute>
+            </Shell>
+          </RouteGuard>
+        }
+      />
+
       {/* Student/parent pages */}
       <Route
         path="/my/invoices"
@@ -258,6 +275,18 @@ export default function App() {
           </RouteGuard>
         }
       />  
+
+      {/* Student/parent help (any authenticated user) */}
+      <Route
+        path="/help/student"
+        element={
+          <RouteGuard>
+            <Shell>
+              <HelpStudent />
+            </Shell>
+          </RouteGuard>
+        }
+      />
 
       {/* About for any authenticated user */}
       <Route
