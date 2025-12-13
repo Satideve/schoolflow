@@ -334,7 +334,46 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
 
     # totals
     items_total = _sum_amounts(items)
-    total_due = amount if amount is not None else items_total
+
+    # NEW: subtract concession if assignment exists
+    concession = None
+    try:
+        if FeeAssignment:
+            assignment = (
+                db.query(FeeAssignment)
+                .filter(FeeAssignment.student_id == invoice.student_id)
+                .first()
+            )
+            if assignment and getattr(assignment, "concession", None):
+                concession = _safe_float(assignment.concession)
+    except Exception:
+        concession = None
+
+    # Inject concession as a negative item into items[] for display
+    if concession is not None and concession > 0:
+        items.append({
+            "id": None,
+            "description": "Concession",
+            "amount": -float(concession)
+        })
+
+    # Compute raw due
+    raw_total_due = amount if amount is not None else items_total
+
+    # Apply concession once to total
+    if concession is not None:
+        raw_total_due = (raw_total_due or 0.0) - concession
+
+    total_due = raw_total_due
+
+    # Ensure concession (negative item) appears at bottom
+    try:
+        items = sorted(items, key=lambda x: (0 if (x.get("amount") or 0) >= 0 else 1))
+    except Exception:
+        pass
+
+
+    # Balance from adjusted total_due
     balance = (
         float(total_due) - float(paid_amount)
         if total_due is not None and paid_amount is not None
@@ -359,8 +398,8 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
         "items_total": items_total,
         "total_due": total_due,
         "balance": balance,
+        "concession": concession,
     }
-
 
 # ----------------------------------------------------------------------
 #                        RECEIPT CONTEXT
@@ -439,6 +478,16 @@ def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
     else:
         # Reuse the canonical invoice context for totals and items
         invoice_ctx = load_invoice_context(invoice_id, db)
+
+        # invoice_ctx = load_invoice_context(invoice_id, db)
+
+        # print("\n\n=== DEBUG: invoice_ctx in receipt ===")
+        # print("items:", invoice_ctx.get("items"))
+        # print("concession:", invoice_ctx.get("concession"))
+        # print("total_due:", invoice_ctx.get("total_due"))
+        # print("items_total:", invoice_ctx.get("items_total"))
+        # print("====================================\n\n")
+
 
         student = invoice_ctx.get("student")
         student_name = invoice_ctx.get("student_name")
@@ -525,4 +574,5 @@ def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
         "amount_due": _safe_float(
             getattr(invoice, "amount_due", None)
         ) if invoice else None,
+        "concession": invoice_ctx.get("concession"),
     }
