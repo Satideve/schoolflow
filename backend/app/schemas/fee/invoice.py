@@ -31,6 +31,7 @@ class InvoiceCreate(BaseModel):
     period: str
     due_date: datetime
     amount_due: Optional[Decimal] = None
+    base_amount_description: Optional[str] = None
     payment: Optional[Dict] = None  # optional, preserved
 
     # NEW: admin-entered line items for this invoice
@@ -48,6 +49,7 @@ class InvoiceOut(InvoiceCreate):
     paid_amount: Optional[float] = None
     balance: Optional[float] = None
     items: Optional[List[Any]] = None
+    base_amount_description: Optional[str] = None
 
     class Config:
         from_attributes = True

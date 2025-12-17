@@ -544,3 +544,19 @@ They have fee assignments.
 Invoices have been generated for them.
 
 Once basic data is consistent, SchoolFlow should support a smooth, repeatable fee workflow for your school.
+---
+CRITICAL ACCOUNTING DEFINITIONS (LOCKED)
+
+These definitions are **non-negotiable** and must be respected everywhere (DB, API, UI, PDFs):
+
+| Concept | Meaning |
+|------|-------|
+| **Base Amount** | A flat amount manually added by the school (NOT derived from fee plan) |
+| **Base Amount Description** | Human explanation shown to parents |
+| **Items** | Fee plan components + admin line items |
+| **Items Total** | Sum of all items (including negative concession) |
+| **Concession** | Discount applied once, represented as a negative item |
+| **Total Due** | `base_amount + items_total` |
+| **Paid Amount** | Sum of all payments |
+| **Balance** | `total_due - paid_amount` |
+---------------------------------------

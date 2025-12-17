@@ -183,6 +183,7 @@ def create_invoice(
             due_date=due_date,
             payment=payload.payment,
             line_items=[li.model_dump() for li in (payload.line_items or [])],
+            base_amount_description=payload.base_amount_description, 
         )
         db.commit()
         db.refresh(inv)

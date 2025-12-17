@@ -23,6 +23,7 @@ def create_invoice(
     period: str,
     amount_due: Decimal,
     due_date: datetime,
+    base_amount_description: str | None = None,
 ) -> FeeInvoice:
     """
     Persist a new FeeInvoice in the database.
@@ -44,6 +45,7 @@ def create_invoice(
         period=period,
         amount_due=amount_due,
         due_date=due_date,
+         base_amount_description=base_amount_description,
     )
     db.add(inv)
     try:

@@ -192,6 +192,9 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
 
     amount = _safe_float(getattr(invoice, "amount_due", None))
 
+    base_amount = amount
+    base_amount_description = getattr(invoice, "base_amount_description", None)
+
     # 0) Explicit invoice items from FeeInvoiceItem (admin-entered line items)
     invoice_items: List[Dict[str, Any]] = []
     try:
@@ -358,14 +361,23 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
         })
 
     # Compute raw due
-    raw_total_due = amount if amount is not None else items_total
+    base_amount = _safe_float(getattr(invoice, "amount_due", None))
 
-    # Apply concession once to total
-    if concession is not None:
-        raw_total_due = (raw_total_due or 0.0) - concession
+    items_total = _sum_amounts(
+        [
+            i for i in items
+            if i.get("amount") is not None and i.get("amount") > 0
+        ]
+    )
 
-    total_due = raw_total_due
+    concession_total = concession or 0.0
 
+    total_due = (
+        (base_amount or 0.0)
+        + (items_total or 0.0)
+        - concession_total
+    )
+ 
     # Ensure concession (negative item) appears at bottom
     try:
         items = sorted(items, key=lambda x: (0 if (x.get("amount") or 0) >= 0 else 1))
@@ -373,12 +385,11 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
         pass
 
 
+    paid_amount = paid_amount or 0.0
+    balance = (total_due or 0.0) - paid_amount
     # Balance from adjusted total_due
-    balance = (
-        float(total_due) - float(paid_amount)
-        if total_due is not None and paid_amount is not None
-        else None
-    )
+
+
 
     return {
         "invoice_id": getattr(invoice, "id", None),
@@ -388,6 +399,8 @@ def load_invoice_context(invoice_id: int, db: Session) -> Dict[str, Any]:
         "items": items,
         "payments": payments,
         "paid_amount": paid_amount,
+        "base_amount": base_amount,
+        "base_amount_description": base_amount_description,
         "student": student,
         "student_name": _student_display_name(student),
         "period": getattr(invoice, "period", None),
@@ -575,4 +588,5 @@ def load_receipt_context(receipt_id: int, db: Session) -> Dict[str, Any]:
             getattr(invoice, "amount_due", None)
         ) if invoice else None,
         "concession": invoice_ctx.get("concession"),
+        "base_amount_description": invoice_ctx.get("base_amount_description"),
     }

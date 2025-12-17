@@ -28,6 +28,7 @@ type FormValues = {
   period: string;
   due_date: string;
   amount_due?: string; // base amount (optional)
+  base_amount_description?: string;
 };
 
 type LineItem = {
@@ -69,10 +70,6 @@ export default function CreateInvoice() {
     const n = Number(baseAmountField);
     return !Number.isNaN(n) && n > 0 ? n : 0;
   }, [baseAmountField]);
-
-  const grandTotal = useMemo(() => {
-    return baseAmount + itemsTotal;
-  }, [baseAmount, itemsTotal]);
 
   // Build student → object map
   const studentMap = useMemo(() => {
@@ -161,6 +158,12 @@ export default function CreateInvoice() {
         payload.amount_due = null;
       }
 
+      // Base amount description (optional)
+      if (values.base_amount_description?.trim()) {
+        (payload as any).base_amount_description =
+          values.base_amount_description.trim();
+      }
+
       // Map local line items -> backend shape
       const line_items = items
         .map((it) => {
@@ -182,6 +185,8 @@ export default function CreateInvoice() {
         // Cast to any to satisfy TS if InvoiceCreateDTO doesn't declare line_items
         (payload as any).line_items = line_items;
       }
+
+      // console.log("invoice payload", payload);
 
       const data = await create.mutateAsync(payload);
 
@@ -267,6 +272,20 @@ export default function CreateInvoice() {
           </p>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Base Amount Description (optional)
+          </label>
+          <input
+            {...register("base_amount_description")}
+            placeholder="e.g. Tuition fee for December"
+            className="w-full border p-2 rounded"
+          />
+          <p className="mt-1 text-xs text-gray-600">
+            This note will appear as a footnote on the invoice and receipt.
+          </p>
+        </div>
+
         {/* Line items section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -345,14 +364,14 @@ export default function CreateInvoice() {
               <span className="font-semibold">₹{baseAmount.toFixed(2)}</span>
             </div>
             <div>
-              Line items total:{" "}
+              Line items total (added on top):{" "}
               <span className="font-semibold">₹{itemsTotal.toFixed(2)}</span>
             </div>
-            <div>
-              <span className="font-semibold">Final invoice amount:</span>{" "}
-              <span className="font-bold">₹{grandTotal.toFixed(2)}</span>
+            <div className="text-xs text-gray-600">
+              Final payable amount will be calculated by the system.
             </div>
           </div>
+
         </div>
 
         {/* Submit */}

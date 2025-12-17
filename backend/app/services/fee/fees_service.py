@@ -138,6 +138,7 @@ class FeesService:
         due_date: datetime,
         payment: dict | None = None,
         line_items: list[dict] | None = None,
+        base_amount_description: str | None = None,
     ) -> FeeInvoice:
         """
         Idempotently generate a FeeInvoice record and render its PDF.
@@ -174,6 +175,7 @@ class FeesService:
             period=period,
             amount_due=placeholder_amount,
             due_date=due_date,
+            base_amount_description=base_amount_description,
         )
         self.db.commit()
         self.db.refresh(inv)
@@ -213,39 +215,21 @@ class FeesService:
             inv = self.db.merge(inv)
             self.db.refresh(inv)
 
-        # 2) Compute base total from items (fee plan / components + FeeInvoiceItem) and add extra amount.
-        try:
-            ctx_for_total = load_invoice_context(inv.id, self.db)
-            items_total = ctx_for_total.get("items_total")
+        # 2) Persist base amount ONLY (never aggregate here)
+        if amount is not None:
+            inv.amount_due = _decimal(amount) or Decimal("0")
+        else:
+            inv.amount_due = Decimal("0")
 
-            base_total = _decimal(items_total) if items_total is not None else Decimal("0")
-            extra = _decimal(amount) if amount is not None else Decimal("0")
+        self.db.commit()
+        self.db.refresh(inv)
 
-            final_due = base_total + extra
-
-            inv.amount_due = final_due
-            self.db.commit()
-            self.db.refresh(inv)
-
-            logger.info(
-                "Computed amount_due=%.2f for invoice %s (id=%s) from base_total=%.2f + extra=%.2f",
-                float(final_due),
-                invoice_no,
-                inv.id,
-                float(base_total),
-                float(extra),
-            )
-        except Exception as e:
-            # Non-fatal: if anything goes wrong, keep the placeholder (0 or extra).
-            logger.warning("Could not compute invoice amount_due from items_total/extra: %s", e)
-            # If amount was provided and we failed to load items_total, fall back to that.
-            try:
-                if amount is not None:
-                    inv.amount_due = _decimal(amount) or Decimal("0")
-                    self.db.commit()
-                    self.db.refresh(inv)
-            except Exception:
-                logger.exception("Fallback setting of amount_due from extra amount failed")
+        logger.info(
+            "Stored base amount_due=%.2f for invoice %s (id=%s)",
+            float(inv.amount_due),
+            invoice_no,
+            inv.id,
+        )
 
         # 3) Optional payment handling (idempotent with unique key)
         if payment:

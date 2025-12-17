@@ -13,6 +13,7 @@ class FeeInvoice(Base):
     invoice_no = Column(String(64), nullable=False, unique=True, index=True)
     period = Column(String(32), nullable=False)
     amount_due = Column(Numeric(10, 2), nullable=False, default=0)
+    base_amount_description = Column(String(255), nullable=True)
     due_date = Column(DateTime, nullable=False)
     status = Column(String(32), nullable=False, default="pending")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
