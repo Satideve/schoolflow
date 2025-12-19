@@ -5,8 +5,10 @@ from decimal import Decimal
 from uuid import uuid4
 from typing import Optional
 
-from app.services.payments.fake_adapter import FakePaymentAdapter
+
 from app.services.messaging.fake_adapter import FakeMessagingAdapter
+
+
 from app.services.fee.fees_service import FeesService
 from app.db.session import get_db
 
@@ -23,6 +25,7 @@ router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 @router.post("/create-order/{invoice_id}")
 def create_order(invoice_id: int, db: Session = Depends(get_db)):
   # Simplified: find invoice then create order
+  from app.services.payments.factory import get_payment_gateway
   invoice = (
       db.query(
           __import__("app.models.fee.fee_invoice", fromlist=["FeeInvoice"]).FeeInvoice
@@ -35,7 +38,7 @@ def create_order(invoice_id: int, db: Session = Depends(get_db)):
       )
   svc = FeesService(
       db=db,
-      payment_gateway=FakePaymentAdapter(),
+      payment_gateway=get_payment_gateway(),
       messaging=FakeMessagingAdapter(),
   )
   order = svc.create_payment_order(invoice_id, invoice.amount_due)
@@ -117,7 +120,7 @@ def create_manual_payment(
       provider=provider,
       provider_txn_id=provider_txn_id,
       amount=amt,
-      status="success",
+      status="paid",
       # idempotency_key left as None for manual demo payments
   )
   db.add(payment)
@@ -163,6 +166,7 @@ async def webhook(
   x_signature: str | None = Header(None),
   db: Session = Depends(get_db),
 ):
+  from app.services.payments.factory import get_payment_gateway
   body = await request.body()
 
   # ✅ Inject wkhtmltopdf options to avoid QPainter errors
@@ -176,7 +180,7 @@ async def webhook(
 
   svc = FeesService(
       db=db,
-      payment_gateway=FakePaymentAdapter(),
+      payment_gateway=get_payment_gateway(),
       messaging=FakeMessagingAdapter(),
   )
   try:

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routers import auth, health, class_sections, students, pdf
 from app.api.v1.routers.fees import plans, invoices, payments
+
 from app.api.v1.routers.fees.receipts import router as receipts_router
 from app.api.v1.routers.users import router as users_router
 from app.api.v1.routers.fees.fee_components import router as fee_components_router
