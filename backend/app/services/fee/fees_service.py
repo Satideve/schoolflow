@@ -320,7 +320,7 @@ class FeesService:
                 provider="fake",
                 provider_txn_id=provider_txn_id,
                 amount=paid_amount,
-                status="captured",
+                status="paid",
                 idempotency_key=idempotency_key,
             )
         except IntegrityError:
