@@ -1,6 +1,7 @@
 # backend/app/api/v1/routers/fees/payments.py
 
 from fastapi import APIRouter, Request, Header, Depends, HTTPException
+from fastapi import Body
 from sqlalchemy.orm import Session
 from decimal import Decimal
 from uuid import uuid4
@@ -176,3 +177,36 @@ async def webhook(
             status_code=400,
             detail={"code": "webhook_failed", "message": str(e)},
         )
+
+# ⚠ DEV ONLY
+# This endpoint exists only to test webhook flow via Swagger.
+# Do NOT enable in production environments.
+
+
+class WebhookTestPayload(BaseModel):
+    provider: str
+    invoice_id: int
+    provider_txn_id: str
+    amount: float
+    status: str
+
+
+@router.post("/webhook-test")
+def webhook_test(
+    payload: WebhookTestPayload = Body(...),
+    db: Session = Depends(get_db),
+):
+    from app.services.payments.factory import get_payment_gateway
+
+    svc = FeesService(
+        db=db,
+        payment_gateway=get_payment_gateway(),
+        messaging=FakeMessagingAdapter(),
+    )
+
+    return svc.handle_webhook_mark_paid(
+        webhook_payload=payload.json().encode(),
+        signature="test-signature",
+    )
+
+
