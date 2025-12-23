@@ -1,7 +1,6 @@
 # backend/app/api/v1/routers/fees/payments.py
 
-from fastapi import APIRouter, Request, Header, Depends, HTTPException
-from fastapi import Body
+from fastapi import APIRouter, Request, Header, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from decimal import Decimal
 from uuid import uuid4
@@ -20,6 +19,7 @@ from app.services.fee.fees_service import FeesService
 from app.services.fee.receipt_service import ReceiptService
 from app.services.messaging.fake_adapter import FakeMessagingAdapter
 from app.services.payments.factory import get_payment_gateway
+from app.core.config import settings
 
 router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
@@ -65,7 +65,6 @@ def create_manual_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1. Invoice
     invoice = db.query(FeeInvoice).get(invoice_id)
     if not invoice:
         raise HTTPException(
@@ -73,7 +72,6 @@ def create_manual_payment(
             detail={"code": "not_found", "message": "Invoice not found"},
         )
 
-    # 2. RBAC
     role = getattr(current_user, "role", None)
     if role in {"student", "parent"}:
         if getattr(current_user, "student_id", None) != invoice.student_id:
@@ -87,7 +85,6 @@ def create_manual_payment(
             detail={"code": "forbidden", "message": "Not authorized"},
         )
 
-    # 3. Amount validation
     try:
         amount = Decimal(str(payload.amount))
     except Exception:
@@ -102,19 +99,17 @@ def create_manual_payment(
             detail={"code": "invalid_amount", "message": "Amount must be > 0"},
         )
 
-    # 4. Create Payment (VALID STATE)
     payment = Payment(
         fee_invoice_id=invoice.id,
         provider=payload.provider or "manual",
         provider_txn_id=f"MANUAL-{invoice.id}-{uuid4().hex[:10]}",
         amount=amount,
-        status="paid",  # 🔑 MUST be paid/posted
+        status="paid",
     )
 
     db.add(payment)
-    db.flush()  # get payment.id
+    db.flush()
 
-    # 5. Create Receipt + PDF
     receipt_service = ReceiptService(db)
     receipt_no = f"REC-{uuid4().hex[:8].upper()}"
 
@@ -142,7 +137,7 @@ def create_manual_payment(
 
 
 # -------------------------------------------------------------------
-# WEBHOOK (ONLINE GATEWAYS)
+# REAL WEBHOOK (ONLINE GATEWAYS)
 # -------------------------------------------------------------------
 @router.post("/webhook")
 async def webhook(
@@ -151,6 +146,42 @@ async def webhook(
     db: Session = Depends(get_db),
 ):
     body = await request.body()
+
+    svc = FeesService(
+        db=db,
+        payment_gateway=get_payment_gateway(),
+        messaging=FakeMessagingAdapter(),
+    )
+
+    try:
+        return svc.handle_webhook_mark_paid(
+            webhook_payload=body,
+            signature=x_signature or "",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "webhook_failed", "message": str(e)},
+        )
+
+
+# -------------------------------------------------------------------
+# DEV-ONLY WEBHOOK SIMULATOR (NO RAZORPAY ACCOUNT REQUIRED)
+# -------------------------------------------------------------------
+class WebhookTestPayload(BaseModel):
+    provider: str = "razorpay"
+    invoice_id: int
+    provider_txn_id: Optional[str] = None
+    amount: float
+    status: str = "paid"
+
+
+@router.post("/webhook-test")
+def webhook_test(
+    payload: WebhookTestPayload = Body(...),
+    db: Session = Depends(get_db),
+):
+    from app.services.payments.factory import get_payment_gateway
 
     pdf_options = {
         "header-right": "Page [page] of [topage]",
@@ -166,47 +197,8 @@ async def webhook(
         messaging=FakeMessagingAdapter(),
     )
 
-    try:
-        return svc.handle_webhook_mark_paid(
-            body,
-            x_signature or "",
-            pdf_options,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "webhook_failed", "message": str(e)},
-        )
-
-# ⚠ DEV ONLY
-# This endpoint exists only to test webhook flow via Swagger.
-# Do NOT enable in production environments.
-
-
-class WebhookTestPayload(BaseModel):
-    provider: str
-    invoice_id: int
-    provider_txn_id: str
-    amount: float
-    status: str
-
-
-@router.post("/webhook-test")
-def webhook_test(
-    payload: WebhookTestPayload = Body(...),
-    db: Session = Depends(get_db),
-):
-    from app.services.payments.factory import get_payment_gateway
-
-    svc = FeesService(
-        db=db,
-        payment_gateway=get_payment_gateway(),
-        messaging=FakeMessagingAdapter(),
-    )
-
     return svc.handle_webhook_mark_paid(
         webhook_payload=payload.json().encode(),
         signature="test-signature",
+        pdf_options=pdf_options,   # 🔑 REQUIRED
     )
-
-

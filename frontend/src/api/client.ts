@@ -7,6 +7,14 @@ import axios from "axios";
  */
 const baseURL = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
+console.info(
+  "[API] Backend target:",
+  API_BASE || "via Vite proxy (/api → localhost:8000)"
+);
+
+
 /**
  * Axios instance:
  * - withCredentials: true allows cookie-based auth (backend supports both token + cookie)

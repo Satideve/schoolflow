@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "dev:ngrok": "vite --mode ngrok",
     "preview": "vite preview --port 5174",
     "lint": "eslint --ext .ts,.tsx src || true",
     "typecheck": "tsc --noEmit"
@@ -39,3 +40,4 @@
     "vite": "^5.0.0"
   }
 }
+
