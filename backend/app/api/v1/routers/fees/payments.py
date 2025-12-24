@@ -183,6 +183,12 @@ def webhook_test(
 ):
     from app.services.payments.factory import get_payment_gateway
 
+    # 🚫 DEV ONLY SAFETY GUARD
+    if settings.environment != "development":
+        raise HTTPException(
+            status_code=404,
+            detail="Not found",
+        )
     pdf_options = {
         "header-right": "Page [page] of [topage]",
         "encoding": "UTF-8",

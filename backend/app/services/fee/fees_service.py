@@ -40,6 +40,8 @@ from app.services.pdf.context_loader import load_receipt_context, load_invoice_c
 from app.services.messaging.interface import MessagingInterface
 from app.models.fee.fee_invoice import FeeInvoice
 from app.models.fee.fee_invoice_item import FeeInvoiceItem
+from app.models.fee.payment import Payment
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -303,15 +305,25 @@ class FeesService:
         idempotency_key = data.get("idempotency_key") or provider_txn_id
 
         # Idempotency check via unique key. If present, ignore gracefully.
+        # -------------------------------------------------
+        # 🔐 IDEMPOTENCY GUARD (provider + txn id)
+        # -------------------------------------------------
         existing_payment = (
-            self.db.query(
-                __import__("app.models.fee.payment", fromlist=["Payment"]).Payment
+            self.db.query(Payment)
+            .filter(
+                Payment.provider == "fake",
+                Payment.provider_txn_id == provider_txn_id,
             )
-            .filter_by(idempotency_key=idempotency_key)
             .first()
         )
+
         if existing_payment:
-            return {"status": "ignored", "reason": "idempotent replay"}
+            return {
+                "status": "ok",
+                "idempotent": True,
+                "payment_id": existing_payment.id,
+                "message": "Webhook already processed",
+            }
 
         try:
             payment = create_payment(
