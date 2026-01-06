@@ -68,8 +68,15 @@ COPY ../backend ./
 # RUN chmod -R 755 /app/backend/ops || true
 
 # 8. Drop privileges: create and switch to a non-root user
+# Create non-root user
 RUN addgroup --system appgroup \
  && adduser --system --ingroup appgroup appuser
+
+# Ensure runtime directories are writable
+RUN mkdir -p /app/backend/data \
+ && mkdir -p /app/backend/data/receipts \
+ && chown -R appuser:appgroup /app/backend
+
 USER appuser
 
 EXPOSE 8000
