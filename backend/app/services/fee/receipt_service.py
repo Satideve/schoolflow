@@ -42,7 +42,20 @@ from app.services.pdf.renderer import render_receipt_pdf
 
 logger = logging.getLogger("app.services.receipt_service")
 
-RECEIPTS_DIR = Path("app/data/receipts")
+# RECEIPTS_DIR = Path("app/data/receipts")
+# RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
+
+import os
+
+# Base data directory (container-safe, overrideable)
+DATA_DIR = Path(
+    os.environ.get(
+        "DATA_DIR",
+        "/app/backend/app/data",  # correct absolute path inside container
+    )
+)
+
+RECEIPTS_DIR = DATA_DIR / "receipts"
 RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
