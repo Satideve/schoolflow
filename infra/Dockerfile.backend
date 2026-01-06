@@ -75,7 +75,7 @@ RUN addgroup --system appgroup \
 # Ensure runtime directories are writable
 RUN mkdir -p /app/backend/data \
  && mkdir -p /app/backend/data/receipts \
- && chown -R appuser:appgroup /app/backend
+ && chown -R appuser:appgroup /app/backend/data
 
 USER appuser
 
