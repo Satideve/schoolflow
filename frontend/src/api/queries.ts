@@ -412,7 +412,7 @@ export function useCreateFeeAssignment() {
       concession?: number;
       note?: string;
     }): Promise<FeeAssignment> => {
-      const { data } = await api.post("/api/v1/fee-assignments", payload);
+      const { data } = await api.post("/api/v1/fee-assignments/", payload);
       return data;
     },
     onSuccess: () => {
