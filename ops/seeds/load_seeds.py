@@ -357,23 +357,45 @@ def run():
     """Main function to run all seeds in order, and then fix sequences for Postgres."""
     db = SessionLocal()
     try:
-        from app.models.user import User
-        # Admin user creation
-        OLD_EMAIL = "admin@school.local"
-        NEW_EMAIL = "admin@example.com"
-        DEFAULT_PASSWORD = "ChangeMe123!"
-        migrated = db.execute(select(User).where(User.email == OLD_EMAIL)).scalar_one_or_none()
-        if migrated:
-            db.execute(update(User).where(User.id == migrated.id).values(email=NEW_EMAIL))
-            db.commit()
-            logger.info("Seed migrate: updated admin email %s -> %s", OLD_EMAIL, NEW_EMAIL)
-        if not db.execute(select(User).where(User.email == NEW_EMAIL)).scalar_one_or_none():
-            user = User(email=NEW_EMAIL, hashed_password=get_password_hash(DEFAULT_PASSWORD), role="admin")
-            db.add(user)
-            db.commit()
-            logger.info("Seed done: admin user created (%s).", NEW_EMAIL)
-        else:
-            logger.info("Seed skipped: admin already exists (%s).", NEW_EMAIL)
+    # ---------------------------------------------------------------------------
+    # ADMIN USER SEEDING — DISABLED
+    #
+    # IMPORTANT (PRODUCTION SAFETY):
+    # Admin / auth users must NOT be created implicitly by seed scripts.
+    # Admin users are created explicitly via:
+    #   POST /api/v1/auth/register
+    # or a controlled one-time bootstrap process.
+    #
+    # This block is intentionally disabled to keep:
+    # - seed scripts idempotent
+    # - auth state explicit and auditable
+    # - production behavior safe
+    # ---------------------------------------------------------------------------
+
+    # from app.models.user import User
+    #
+    # OLD_EMAIL = "admin@school.local"
+    # NEW_EMAIL = "admin@example.com"
+    # DEFAULT_PASSWORD = "ChangeMe123!"
+    #
+    # migrated = db.execute(select(User).where(User.email == OLD_EMAIL)).scalar_one_or_none()
+    # if migrated:
+    #     db.execute(update(User).where(User.id == migrated.id).values(email=NEW_EMAIL))
+    #     db.commit()
+    #     logger.info("Seed migrate: updated admin email %s -> %s", OLD_EMAIL, NEW_EMAIL)
+    #
+    # if not db.execute(select(User).where(User.email == NEW_EMAIL)).scalar_one_or_none():
+    #     user = User(
+    #         email=NEW_EMAIL,
+    #         hashed_password=get_password_hash(DEFAULT_PASSWORD),
+    #         role="admin",
+    #     )
+    #     db.add(user)
+    #     db.commit()
+    #     logger.info("Seed done: admin user created (%s).", NEW_EMAIL)
+    # else:
+    #     logger.info("Seed skipped: admin already exists (%s).", NEW_EMAIL)
+
 
         # Sequential seeding
         seq = [
