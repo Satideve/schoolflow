@@ -105,9 +105,11 @@ export default function FeeAssignments() {
     }
   };
 
-  const list: FeeAssignment[] = Array.isArray(assignmentsData)
-    ? assignmentsData
-    : (assignmentsData ?? []);
+  const list: FeeAssignment[] = useMemo(() => {
+    if (Array.isArray(assignmentsData)) return assignmentsData;
+    return [];
+  }, [assignmentsData]);
+
 
   const startEditing = (a: FeeAssignment) => {
     setEditingId(a.id);
@@ -265,12 +267,19 @@ export default function FeeAssignments() {
 
       <section className="bg-white rounded shadow p-4">
         <h3 className="font-medium mb-3">Existing Assignments</h3>
-        {loadingAssignments ? (
+
+        {loadingAssignments && (
           <div className="text-sm text-gray-500">Loading assignments...</div>
-        ) : !list || list.length === 0 ? (
+        )}
+
+        {!loadingAssignments && list.length === 0 && (
           <div className="text-sm text-gray-500">No assignments yet.</div>
-        ) : (
+        )}
+
+        {!loadingAssignments && list.length > 0 && (
           <div className="overflow-x-auto">
+
+
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b">
