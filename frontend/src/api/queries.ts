@@ -395,7 +395,7 @@ export function useFeeAssignments() {
   return useQuery({
     queryKey: ["fee-assignments"],
     queryFn: async (): Promise<FeeAssignment[]> => {
-      const { data } = await api.get("/api/v1/fee-assignments");
+      const { data } = await api.get("/api/v1/fee-assignments/");
       return data;
     },
   });
