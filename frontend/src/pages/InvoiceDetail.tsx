@@ -215,7 +215,7 @@ export default function InvoiceDetail() {
             type="button"
             className="inline-flex items-center px-3 py-1.5 rounded bg-gray-800 text-white text-sm hover:bg-gray-900"
             onClick={async () => {
-              console.log("PDF download token:", user?.token);
+              
 
               if (!token) {
                 toast.push("Not authenticated");
