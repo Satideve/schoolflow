@@ -12,6 +12,7 @@ import { createPaymentOrder, CreatePaymentPayload } from "../api/payments";
 import PaymentDialog from "../components/PaymentDialog";
 import { useToast } from "../components/ui/use-toast";
 import { useAuth } from "../store/auth";
+import { downloadWithAuth } from "../lib/download";
 
 const isDev =
   import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
@@ -209,25 +210,29 @@ export default function InvoiceDetail() {
         </div>
 
         <div className="flex gap-2">
-          <a
-            href={`${base}/api/v1/invoices/${inv.id}/download`}
-            target="_blank"
-            rel="noreferrer"
-            className="
-              inline-flex
-              items-center
-              justify-center   /* 👈 ensures proper centering */
-              px-3
-              py-1.5
-              rounded
-              bg-gray-800
-              text-white
-              text-sm
-              hover:bg-gray-900
-            "
+
+          <button
+            type="button"
+            className="inline-flex items-center px-3 py-1.5 rounded bg-gray-800 text-white text-sm hover:bg-gray-900"
+            onClick={async () => {
+              if (!user?.token) {
+                toast.push("Not authenticated");
+                return;
+              }
+
+              try {
+                await downloadWithAuth(
+                  `${base}/api/v1/invoices/${inv.id}/download`,
+                  `invoice-${inv.invoice_no ?? inv.id}.pdf`,
+                  user.token,
+                );
+              } catch {
+                toast.push("Failed to download invoice PDF");
+              }
+            }}
           >
             {isStudentLike ? "View PDF" : "Download PDF"}
-          </a>
+          </button>
 
 
           {balance > 0 && (
