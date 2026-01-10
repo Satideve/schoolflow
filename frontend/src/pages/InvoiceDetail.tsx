@@ -282,26 +282,31 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {latestReceipt && (
-          <div className="p-3 border rounded bg-gray-50">
-            <div className="flex justify-between">
-              <div>
-                <div className="font-medium">
-                  Receipt {latestReceipt.receipt_no ?? latestReceipt.id}
-                </div>
-                <div>{formatMoney(latestReceipt.amount)}</div>
-              </div>
-              <a
-                href={`${base}/api/v1/receipts/${latestReceipt.id}/download`}
-                target="_blank"
-                rel="noreferrer"
-                className="px-2 py-1 border rounded text-sm"
-              >
-                Download receipt
-              </a>
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          className="px-2 py-1 border rounded text-sm"
+          onClick={async () => {
+            if (!token) {
+              toast.push("Not authenticated");
+              return;
+            }
+
+            try {
+              await downloadWithAuth(
+                `${base}/api/v1/receipts/${latestReceipt.id}/download`,
+                `receipt-${latestReceipt.receipt_no ?? latestReceipt.id}.pdf`,
+                token,
+              );
+              toast.push("Receipt PDF downloaded");
+            } catch {
+              toast.push("Failed to download receipt PDF");
+            }
+          }}
+        >
+          Download receipt
+        </button>
+
+
       </div>
 
       <PaymentDialog
