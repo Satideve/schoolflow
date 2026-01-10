@@ -228,6 +228,7 @@ export default function InvoiceDetail() {
                   `invoice-${inv.invoice_no ?? inv.id}.pdf`,
                   token,
                 );
+                toast.push("Invoice PDF downloaded");
               } catch {
                 toast.push("Failed to download invoice PDF");
               }
