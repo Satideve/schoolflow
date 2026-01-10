@@ -25,7 +25,7 @@ export default function InvoiceDetail() {
 
   const { data: students } = useStudents();
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
   const role = user?.role;
   const isAdminLike =
@@ -217,7 +217,7 @@ export default function InvoiceDetail() {
             onClick={async () => {
               console.log("PDF download token:", user?.token);
 
-              if (!user?.token) {
+              if (!token) {
                 toast.push("Not authenticated");
                 return;
               }
@@ -226,7 +226,7 @@ export default function InvoiceDetail() {
                 await downloadWithAuth(
                   `${base}/api/v1/invoices/${inv.id}/download`,
                   `invoice-${inv.invoice_no ?? inv.id}.pdf`,
-                  user.token,
+                  token,
                 );
               } catch {
                 toast.push("Failed to download invoice PDF");
