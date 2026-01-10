@@ -8,13 +8,16 @@ import { Link } from "react-router-dom";
 import { useInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 
+import { downloadWithAuth } from "../lib/download";
+import { useAuth } from "../store/auth";
+
 type StatusFilter = "all" | "pending" | "paid";
 
 export default function InvoicesList() {
   const { data, isLoading, isError } = useInvoices();
   const { data: students } = useStudents();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
+  const { token } = useAuth();
   if (isLoading) {
     return <div>Loading invoices...</div>;
   }
@@ -158,14 +161,30 @@ export default function InvoicesList() {
                       >
                         Open
                       </Link>
-                      <a
-                        href={`${base}/api/v1/invoices/${inv.id}/download`}
-                        target="_blank"
-                        rel="noreferrer"
+
+                      <button
+                        type="button"
                         className="text-green-700 hover:underline"
+                        onClick={async () => {
+                          if (!token) {
+                            alert("Not authenticated");
+                            return;
+                          }
+
+                          try {
+                            await downloadWithAuth(
+                              `${base}/api/v1/invoices/${inv.id}/download`,
+                              `invoice-${inv.invoice_no ?? inv.id}.pdf`,
+                              token,
+                            );
+                          } catch (e) {
+                            alert("Failed to download invoice PDF");
+                          }
+                        }}
                       >
                         PDF
-                      </a>
+                      </button>
+
                     </div>
                   </td>
                 </tr>
