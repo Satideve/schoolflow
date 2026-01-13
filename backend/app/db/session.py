@@ -40,8 +40,10 @@ except Exception as _e:
 print("=== END IMPORT-TIME DB DEBUG ===", file=sys.stderr, flush=True)
 
 # Regular scoped session for application use (e.g. dependency get_db)
-SessionLocal = scoped_session(
-    sessionmaker(bind=engine, autoflush=False, future=True)
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    future=True,
 )
 
 # Export a plain sessionmaker intended for tests (fixtures / TestClient to share)
@@ -49,11 +51,12 @@ SessionLocal = scoped_session(
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
 
 def get_db():
-    """
-    FastAPI dependency: yields a Session from the scoped SessionLocal.
-    """
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
+# 

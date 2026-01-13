@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Security, status, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+from app.db.session import SessionLocal
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
@@ -172,13 +173,26 @@ def get_current_user(
             detail={"code": "invalid_token", "message": "Could not validate credentials"},
         )
 
-    # 5) Fetch user
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    # 5) Fetch user (ISOLATED session to avoid concurrent access)
+    try:
+        with SessionLocal() as auth_db:
+            user = (
+                auth_db.query(User)
+                .filter(User.id == int(user_id))
+                .first()
+            )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "invalid_token", "message": "User lookup failed"},
+        )
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": "invalid_token", "message": "User not found"},
         )
+
     return user
 
 

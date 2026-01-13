@@ -470,6 +470,8 @@ export function useInvoices() {
       const { data } = await api.get("/api/v1/invoices/");
       return data;
     },
+    refetchOnWindowFocus: false,
+    retry: false,    
   });
 }
 
@@ -623,8 +625,11 @@ export function useReceipts() {
       const { data } = await api.get("/api/v1/receipts/");
       return data;
     },
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 }
+
 
 /* ------------------------------------------------------
    CREATE PORTAL USER (student-linked user)
