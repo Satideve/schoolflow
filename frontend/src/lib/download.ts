@@ -23,6 +23,11 @@ export async function downloadWithAuth(
   document.body.appendChild(a);
   a.click();
 
-  a.remove();
+a.remove();
+
+// Delay revocation to avoid race on slower environments (Vercel)
+setTimeout(() => {
   window.URL.revokeObjectURL(blobUrl);
+}, 1000);
+
 }
