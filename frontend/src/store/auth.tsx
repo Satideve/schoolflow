@@ -6,6 +6,7 @@ import type { TokenResponse } from "../types/api";
 type AuthContext = {
   token?: string | null;
   user?: any | null;
+  authReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -66,6 +67,7 @@ function decodeJwtPayload(token: string): any | null {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setTokenState] = useState<string | null>(() => getStoredToken());
   const [user, setUser] = useState<any | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     if (token) {
@@ -95,7 +97,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       (async () => {
         try {
           const { data } = await api.get("/api/v1/auth/me");
-          // Expecting: { id, email, role, is_active, student_id? }
           setUser((prev: any) => ({
             ...prev,
             ...data,
@@ -104,12 +105,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (err) {
           console.error("[Auth] failed to load /auth/me:", err);
           // keep fallback from decoded JWT
+        } finally {
+          setAuthReady(true);
         }
       })();
+
+
     } else {
       setAuthToken(undefined);
       setStoredToken(null);
       setUser(null);
+      setAuthReady(true);
       console.debug("[Auth] token cleared");
     }
   }, [token]);
@@ -170,7 +176,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthCtx.Provider value={{ token, user, login, logout }}>
+    <AuthCtx.Provider value={{ token, user, authReady, login, logout }}>
       {children}
     </AuthCtx.Provider>
   );
