@@ -6,14 +6,22 @@
 import React from "react";
 import { useReceipts, useInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
+import { useAuth } from "../store/auth";
+import { downloadWithAuth } from "../lib/download";
 
 export default function ReceiptsList() {
-  // 1) Always call hooks at the top, in a fixed order
+  const { authReady, token } = useAuth();
+
+  if (!authReady) {
+    return <div>Initializing</div>;
+  }
+
   const {
     data: receiptsData,
     isLoading: loadingReceipts,
     isError: errorReceipts,
   } = useReceipts();
+
 
   const { data: invoicesData } = useInvoices();
   const { data: studentsData } = useStudents();
@@ -28,9 +36,7 @@ export default function ReceiptsList() {
   }
 
   // 3) Normalize data shapes
-  const receipts = Array.isArray(receiptsData)
-    ? receiptsData
-    : (receiptsData?.results ?? receiptsData ?? []);
+const receipts = Array.isArray(receiptsData) ? receiptsData : [];
 
   if (!receipts || receipts.length === 0) {
     return (
@@ -110,14 +116,24 @@ export default function ReceiptsList() {
                 </td>
                 <td className="p-2">{formatDateTime(r.created_at)}</td>
                 <td className="p-2">
-                  <a
-                    href={`${base}/api/v1/receipts/${r.id}/download`}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
                     className="text-blue-600"
+                    onClick={async () => {
+                      try {
+                        await downloadWithAuth(
+                          `${base}/api/v1/receipts/${r.id}/download`,
+                          `receipt-${r.receipt_no ?? r.id}.pdf`,
+                          token!,
+                        );
+                      } catch {
+                        // optional
+                      }
+                    }}
                   >
                     Download
-                  </a>
+                  </button>
+
                 </td>
               </tr>
             ))}
