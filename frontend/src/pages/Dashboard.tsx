@@ -491,8 +491,18 @@ const StudentParentDashboard: React.FC<{ role: string | undefined }> = ({
    ROOT DASHBOARD SWITCH
 ------------------------------------------------------------------- */
 
+
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
+
+  if (!authReady) {
+    return (
+      <div className="text-slate-500 text-sm">
+        Initializing session…
+      </div>
+    );
+  }
+
   const role = user?.role;
 
   const isAdminLike =
@@ -504,5 +514,6 @@ const Dashboard: React.FC = () => {
 
   return <StudentParentDashboard role={role} />;
 };
+
 
 export default Dashboard;
