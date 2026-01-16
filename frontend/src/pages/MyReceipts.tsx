@@ -5,13 +5,18 @@ import { useReceipts, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 
 const MyReceipts: React.FC = () => {
-  const { user } = useAuth();
+  const { user, authReady, token } = useAuth();
   const role = user?.role ?? "user";
+
+  if (!authReady) {
+    return <div>Initializing…</div>;
+  }
 
   const { data, isLoading, isError } = useReceipts();
   const { data: studentsData } = useStudents();
 
-  const receipts = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+
+const receipts = Array.isArray(data) ? data : [];
 
   const students = Array.isArray(studentsData)
     ? studentsData
