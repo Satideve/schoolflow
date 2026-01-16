@@ -9,6 +9,7 @@ import {
   useStudents,
 } from "../api/queries";
 import { useAuth } from "../store/auth";
+import { downloadWithAuth } from "../lib/download";
 import { formatMoney } from "../lib/utils";
 
 /* ------------------------------------------------------------------
@@ -16,7 +17,16 @@ import { formatMoney } from "../lib/utils";
 ------------------------------------------------------------------- */
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, authReady, token } = useAuth();
+
+  if (!authReady) {
+    return (
+      <div className="text-slate-500 text-sm">
+        Initializing dashboard…
+      </div>
+    );
+  }
+
 
   const {
     data: invoicesData,
@@ -30,13 +40,9 @@ const AdminDashboard: React.FC = () => {
     isError: receiptsError,
   } = useReceipts();
 
-  const invoices = Array.isArray(invoicesData)
-    ? invoicesData
-    : invoicesData?.results ?? invoicesData ?? [];
+  const invoices = Array.isArray(invoicesData) ? invoicesData : [];
 
-  const receipts = Array.isArray(receiptsData)
-    ? receiptsData
-    : receiptsData?.results ?? receiptsData ?? [];
+  const receipts = Array.isArray(receiptsData) ? receiptsData : [];
 
   const totalRevenue =
     invoices && Array.isArray(invoices)
@@ -198,16 +204,27 @@ const AdminDashboard: React.FC = () => {
                         ? new Date(r.created_at).toLocaleString()
                         : "-"}
                     </td>
+                    
                     <td className="p-2">
-                      <a
-                        href={`${base}/api/v1/receipts/${r.id}/download`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
                         className="text-blue-600"
+                        onClick={async () => {
+                          try {
+                            await downloadWithAuth(
+                              `${base}/api/v1/receipts/${r.id}/download`,
+                              `receipt-${r.receipt_no ?? r.id}.pdf`,
+                              token!,
+                            );
+                          } catch {
+                            // optional: toast or console.error
+                          }
+                        }}
                       >
                         Download
-                      </a>
+                      </button>
                     </td>
+
                   </tr>
                 ))}
               </tbody>
@@ -226,7 +243,17 @@ const AdminDashboard: React.FC = () => {
 const StudentParentDashboard: React.FC<{ role: string | undefined }> = ({
   role,
 }) => {
-  const { user } = useAuth();
+  const { user, authReady, token } = useAuth();
+
+  if (!authReady) {
+    return (
+      <div className="text-slate-500 text-sm">
+        Initializing dashboard…
+      </div>
+    );
+  }
+
+
   const { data: studentsData } = useStudents();
   const {
     data: myInvoicesData,
@@ -263,13 +290,11 @@ const StudentParentDashboard: React.FC<{ role: string | undefined }> = ({
       ? studentById.get(studentId)?.name ?? `Student #${studentId}`
       : "Student";
 
-  const invoices = Array.isArray(myInvoicesData)
-    ? myInvoicesData
-    : myInvoicesData?.results ?? myInvoicesData ?? [];
+  const invoices = Array.isArray(myInvoicesData) ? myInvoicesData : [];
 
-  const receipts = Array.isArray(receiptsData)
-    ? receiptsData
-    : receiptsData?.results ?? receiptsData ?? [];
+
+  const receipts = Array.isArray(receiptsData) ? receiptsData : [];
+
 
   const totalPaid =
     invoices && Array.isArray(invoices)
@@ -430,16 +455,27 @@ const StudentParentDashboard: React.FC<{ role: string | undefined }> = ({
                         ? new Date(r.created_at).toLocaleString()
                         : "-"}
                     </td>
+
                     <td className="p-2">
-                      <a
-                        href={`${base}/api/v1/receipts/${r.id}/download`}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
                         className="text-blue-600"
+                        onClick={async () => {
+                          try {
+                            await downloadWithAuth(
+                              `${base}/api/v1/receipts/${r.id}/download`,
+                              `receipt-${r.receipt_no ?? r.id}.pdf`,
+                              token!,
+                            );
+                          } catch {
+                            // optional: toast or console.error
+                          }
+                        }}
                       >
                         Download
-                      </a>
+                      </button>
                     </td>
+
                   </tr>
                 ))}
               </tbody>
