@@ -381,13 +381,35 @@ def download_receipt_pdf(
         )
 
     if not fp.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "code": "not_found",
-                "message": f"PDF file missing on server: {file_path}",
-            },
-        )
+        service = ReceiptService(db)
+        receipt = service.render_receipt_pdf(receipt.id)
+
+        # RE-RESOLVE and RE-VALIDATE
+        try:
+            fp = Path(settings.resolve_path(receipt.pdf_path)).resolve()
+        except Exception:
+            raise HTTPException(status_code=404, detail="Invalid receipt path")
+
+        # Re-check allowed roots
+        allowed = False
+        for root in allowed_roots:
+            try:
+                if root.resolve() in fp.parents:
+                    allowed = True
+                    break
+            except Exception:
+                pass
+
+        if not allowed or not fp.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "code": "not_found",
+                    "message": "Receipt PDF could not be regenerated",
+                },
+            )
+
+        
 
     filename = os.path.basename(str(fp))
     return FileResponse(

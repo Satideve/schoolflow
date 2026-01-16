@@ -158,6 +158,7 @@ def create_app() -> FastAPI:
         return get_swagger_ui_oauth2_redirect_html()
 
     # Graceful startup: initialize DB schema for in-memory or file-based DB
+    # Graceful startup: initialize DB schema for in-memory or file-based DB
     @app.on_event("startup")
     def on_startup():
         load_all_models()
@@ -166,9 +167,13 @@ def create_app() -> FastAPI:
     # Graceful shutdown: remove DB sessions
     @app.on_event("shutdown")
     def on_shutdown():
-        dbsession.SessionLocal.remove()
+        try:
+            dbsession.SessionLocal.close_all()
+        except Exception:
+            pass
 
-    return app
+    return app   # ← THIS WAS MISSING
+
 
 
 app = create_app()
