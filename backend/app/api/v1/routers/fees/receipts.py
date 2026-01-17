@@ -383,8 +383,13 @@ def download_receipt_pdf(
     if not fp.is_file():
         # Lazy re-render if file disappeared (Render ephemeral FS)
         service = ReceiptService(db)
-        try:
-            service.render_receipt_pdf(receipt=receipt)
+        try:            
+            service.create_receipt_and_render(
+                payment_id=receipt.payment_id,
+                receipt_no=receipt.receipt_no,
+                created_by=receipt.created_by,
+)
+            
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
