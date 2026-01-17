@@ -166,7 +166,10 @@ def create_app() -> FastAPI:
     # Graceful shutdown: remove DB sessions
     @app.on_event("shutdown")
     def on_shutdown():
-        dbsession.SessionLocal.remove()
+        try:
+            dbsession.SessionLocal.close_all()
+        except Exception:
+            pass
 
     return app
 
