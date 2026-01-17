@@ -381,13 +381,29 @@ def download_receipt_pdf(
         )
 
     if not fp.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "code": "not_found",
-                "message": f"PDF file missing on server: {file_path}",
-            },
-        )
+        # Lazy re-render if file disappeared (Render ephemeral FS)
+        service = ReceiptService(db)
+        try:
+            service.render_receipt_pdf(receipt=receipt)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": "render_failed",
+                    "message": f"Failed to regenerate receipt PDF: {exc}",
+                },
+            )
+
+        # Re-check after render
+        if not fp.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={
+                    "code": "render_failed",
+                    "message": "Receipt PDF could not be generated",
+                },
+            )
+
 
     filename = os.path.basename(str(fp))
     return FileResponse(
