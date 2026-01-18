@@ -2,12 +2,17 @@
 export async function downloadWithAuth(
   url: string,
   filename: string,
-  token: string,
+  token?: string,
 ) {
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
+    credentials: "include", // always allow cookie-based auth
   });
 
   if (!res.ok) {
@@ -23,11 +28,10 @@ export async function downloadWithAuth(
   document.body.appendChild(a);
   a.click();
 
-a.remove();
+  a.remove();
 
-// Delay revocation to avoid race on slower environments (Vercel)
-setTimeout(() => {
-  window.URL.revokeObjectURL(blobUrl);
-}, 1000);
-
+  // Delay revocation to avoid race on slower environments (Vercel)
+  setTimeout(() => {
+    window.URL.revokeObjectURL(blobUrl);
+  }, 1000);
 }
