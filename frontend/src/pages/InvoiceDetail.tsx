@@ -173,6 +173,14 @@ export default function InvoiceDetail() {
         )[0]
       : null;
 
+  const receiptHistory =
+    Array.isArray(inv.receipts) && inv.receipts.length > 0
+      ? [...inv.receipts].sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime(),
+        )
+      : [];      
   // -------------------------------------------------
   // UI
   // -------------------------------------------------
@@ -282,31 +290,71 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {latestReceipt && (
-          <button
-            type="button"
-            className="px-2 py-1 border rounded text-sm"
-            onClick={async () => {
-              if (!token) {
-                toast.push("Not authenticated");
-                return;
-              }
+        {/* -------------------------------------------------
+            Receipt History (metadata only)
+        ------------------------------------------------- */}
 
-              try {
-                await downloadWithAuth(
-                  `${base}/api/v1/receipts/${latestReceipt.id}/download`,
-                  `receipt-${latestReceipt.receipt_no ?? latestReceipt.id}.pdf`,
-                  token,
-                );
-                toast.push("Receipt PDF downloaded");
-              } catch {
-                toast.push("Failed to download receipt PDF");
-              }
-            }}
-          >
-            Download receipt
-          </button>
-        )}
+        <div className="border-t pt-3">
+          <h3 className="font-semibold mb-2">Receipt History</h3>
+
+          {receiptHistory.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No receipts issued for this invoice yet.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="p-2">Receipt No</th>
+                  <th className="p-2">Created At</th>
+                  <th className="p-2 text-right">Amount</th>
+                  <th className="p-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receiptHistory.map((r: any) => (
+                  <tr key={r.id} className="border-b last:border-b-0">
+                    <td className="p-2">{r.receipt_no ?? "-"}</td>
+                    <td className="p-2">
+                      {r.created_at
+                        ? new Date(r.created_at).toLocaleString()
+                        : "-"}
+                    </td>
+                    <td className="p-2 text-right">
+                      {formatMoney(Number(r.amount ?? 0) || 0)}
+                    </td>
+                    <td className="p-2 text-right">
+                      <button
+                        type="button"
+                        className="text-blue-600 text-sm hover:underline"
+                        onClick={async () => {
+                          if (!token) {
+                            toast.push("Not authenticated");
+                            return;
+                          }
+
+                          try {
+                            await downloadWithAuth(
+                              `${base}/api/v1/receipts/${r.id}/download`,
+                              `receipt-${r.receipt_no ?? r.id}.pdf`,
+                              token,
+                            );
+                            toast.push("Receipt PDF downloaded");
+                          } catch {
+                            toast.push("Failed to download receipt PDF");
+                          }
+                        }}
+                      >
+                        {isStudentLike ? "View" : "Download"}
+                      </button>
+                    </td>
+                  </tr>
+
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
       </div>
 
