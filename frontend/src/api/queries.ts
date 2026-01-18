@@ -14,19 +14,25 @@ import {
   FeeAssignment,
   InvoiceLineItem, // NEW
 } from "../types/api";
+import { useAuth } from "../store/auth";
+
 
 /* ------------------------------------------------------
    STUDENTS
 ------------------------------------------------------- */
 export function useStudents() {
+  const { authReady } = useAuth();
+
   return useQuery({
     queryKey: ["students"],
     queryFn: async (): Promise<Student[]> => {
       const { data } = await api.get("/api/v1/students/");
       return data;
     },
+    enabled: authReady,
   });
 }
+
 
 export function useCreateStudent() {
   const qc = useQueryClient();
@@ -464,29 +470,37 @@ export function useDeleteFeeAssignment() {
    LIST INVOICES (admin)
 ------------------------------------------------------- */
 export function useInvoices() {
+  const { authReady } = useAuth();
+
   return useQuery({
     queryKey: ["invoices"],
     queryFn: async (): Promise<Invoice[]> => {
       const { data } = await api.get("/api/v1/invoices/");
       return data;
     },
+    enabled: authReady,
     refetchOnWindowFocus: false,
-    retry: false,    
+    retry: false,
   });
 }
+
 
 /* ------------------------------------------------------
    LIST MY INVOICES (current user)
 ------------------------------------------------------- */
 export function useMyInvoices() {
+  const { authReady } = useAuth();
+
   return useQuery({
     queryKey: ["my-invoices"],
     queryFn: async (): Promise<Invoice[]> => {
       const { data } = await api.get("/api/v1/invoices/mine");
       return data;
     },
+    enabled: authReady,
   });
 }
+
 
 /* ------------------------------------------------------
    GET SINGLE INVOICE
@@ -619,16 +633,20 @@ export function useDeleteInvoiceLineItem() {
    LIST RECEIPTS
 ------------------------------------------------------- */
 export function useReceipts() {
+  const { authReady } = useAuth();
+
   return useQuery({
     queryKey: ["receipts"],
     queryFn: async (): Promise<Receipt[]> => {
       const { data } = await api.get("/api/v1/receipts/");
       return data;
     },
+    enabled: authReady,
     refetchOnWindowFocus: false,
     retry: false,
   });
 }
+
 
 
 /* ------------------------------------------------------
