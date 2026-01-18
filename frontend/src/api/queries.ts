@@ -21,7 +21,7 @@ import { useAuth } from "../store/auth";
    STUDENTS
 ------------------------------------------------------- */
 export function useStudents() {
-  const { authReady } = useAuth();
+  const { authReady, user } = useAuth();
 
   return useQuery({
     queryKey: ["students"],
@@ -29,7 +29,7 @@ export function useStudents() {
       const { data } = await api.get("/api/v1/students/");
       return data;
     },
-    enabled: authReady,
+    enabled: authReady && !!user,
   });
 }
 
@@ -470,7 +470,7 @@ export function useDeleteFeeAssignment() {
    LIST INVOICES (admin)
 ------------------------------------------------------- */
 export function useInvoices() {
-  const { authReady } = useAuth();
+  const { authReady, user } = useAuth();
 
   return useQuery({
     queryKey: ["invoices"],
@@ -478,7 +478,7 @@ export function useInvoices() {
       const { data } = await api.get("/api/v1/invoices/");
       return data;
     },
-    enabled: authReady,
+    enabled: authReady && !!user,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -489,7 +489,7 @@ export function useInvoices() {
    LIST MY INVOICES (current user)
 ------------------------------------------------------- */
 export function useMyInvoices() {
-  const { authReady } = useAuth();
+  const { authReady, user } = useAuth();
 
   return useQuery({
     queryKey: ["my-invoices"],
@@ -497,7 +497,7 @@ export function useMyInvoices() {
       const { data } = await api.get("/api/v1/invoices/mine");
       return data;
     },
-    enabled: authReady,
+    enabled: authReady && !!user,
   });
 }
 
@@ -633,7 +633,7 @@ export function useDeleteInvoiceLineItem() {
    LIST RECEIPTS
 ------------------------------------------------------- */
 export function useReceipts() {
-  const { authReady } = useAuth();
+  const { authReady, user } = useAuth();
 
   return useQuery({
     queryKey: ["receipts"],
@@ -641,7 +641,7 @@ export function useReceipts() {
       const { data } = await api.get("/api/v1/receipts/");
       return data;
     },
-    enabled: authReady,
+    enabled: authReady && !!user,
     refetchOnWindowFocus: false,
     retry: false,
   });
