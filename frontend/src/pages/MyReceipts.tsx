@@ -3,6 +3,8 @@ import React, { useMemo } from "react";
 import { useAuth } from "../store/auth";
 import { useReceipts, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
+import { downloadWithAuth } from "../lib/download";
+
 
 const MyReceipts: React.FC = () => {
   const { user, authReady, token } = useAuth();
@@ -126,14 +128,25 @@ const receipts = Array.isArray(data) ? data : [];
                 </td>
                 <td className="p-2">{formatDateTime(r.created_at)}</td>
                 <td className="p-2">
-                  <a
-                    href={`${base}/api/v1/receipts/${r.id}/download`}
-                    target="_blank"
-                    rel="noreferrer"
+
+                  <button
+                    type="button"
                     className="text-blue-600"
+                    onClick={async () => {
+                      try {
+                        await downloadWithAuth(
+                          `${base}/api/v1/receipts/${r.id}/download`,
+                          `receipt-${r.receipt_no ?? r.id}.pdf`,
+                          token!
+                        );
+                      } catch {
+                        // optional: toast / console.error
+                      }
+                    }}
                   >
                     Download
-                  </a>
+                  </button>
+
                 </td>
               </tr>
             ))}

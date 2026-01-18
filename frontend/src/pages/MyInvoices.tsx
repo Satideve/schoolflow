@@ -4,15 +4,17 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../store/auth";
 import { useMyInvoices, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
+import { downloadWithAuth } from "../lib/download";
 
 const MyInvoices: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+
   const role = user?.role ?? "user";
 
   const { data, isLoading, isError } = useMyInvoices();
   const { data: studentsData } = useStudents();
 
-  const invoices = Array.isArray(data) ? data : (data?.results ?? data ?? []);
+  const invoices = Array.isArray(data) ? data : [];
   const students = Array.isArray(studentsData)
     ? studentsData
     : (studentsData ?? []);
@@ -155,14 +157,25 @@ const MyInvoices: React.FC = () => {
                         Open
                       </Link>
                       {/* direct PDF link, same as before conceptually */}
-                      <a
-                        href={`${base}/api/v1/invoices/${inv.id}/download`}
-                        target="_blank"
-                        rel="noreferrer"
+
+                      <button
+                        type="button"
                         className="text-slate-600 hover:text-slate-900"
+                        onClick={async () => {
+                          try {
+                            await downloadWithAuth(
+                              `${base}/api/v1/invoices/${inv.id}/download`,
+                              `invoice-${inv.invoice_no ?? inv.id}.pdf`,
+                              token!
+                            );
+                          } catch {
+                            // optional: toast / console.error
+                          }
+                        }}
                       >
                         PDF
-                      </a>
+                      </button>
+
                     </div>
                   </td>
                 </tr>
