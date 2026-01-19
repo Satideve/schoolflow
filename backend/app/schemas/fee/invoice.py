@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Dict, List, Any
+from app.schemas.fee.receipt import ReceiptOut
 
 
 class InvoiceItemCreate(BaseModel):
@@ -50,6 +51,7 @@ class InvoiceOut(InvoiceCreate):
     balance: Optional[float] = None
     items: Optional[List[Any]] = None
     base_amount_description: Optional[str] = None
+    receipts: Optional[List[ReceiptOut]] = None
 
     class Config:
         from_attributes = True

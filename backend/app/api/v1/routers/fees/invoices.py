@@ -40,12 +40,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.models.fee.fee_invoice_item import FeeInvoiceItem
-from app.models.fee.receipt import Receipt as FeeReceipt
 
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
 logger = logging.getLogger("app.audit.invoices")
-
 
 
 def _invoice_out_with_context(inv: FeeInvoice, db: Session) -> InvoiceOut:
@@ -83,19 +81,6 @@ def _invoice_out_with_context(inv: FeeInvoice, db: Session) -> InvoiceOut:
             if k in ctx:
                 merged[k] = ctx.get(k)
 
-        # 🔽 NEW: attach receipt metadata (NO PDFs, NO lazy loading)
-        receipts = (
-            db.query(FeeReceipt)
-            .filter(FeeReceipt.invoice_id == inv.id)
-            .order_by(FeeReceipt.created_at.desc())
-            .all()
-        )
-
-        merged["receipts"] = [
-            ReceiptOut.model_validate(r).model_dump()
-            for r in receipts
-        ]
-
         return InvoiceOut(**merged)
 
     except Exception:
@@ -113,14 +98,7 @@ class InvoiceItemOut(BaseModel):
     class Config:
         from_attributes = True
 
-class ReceiptOut(BaseModel):
-    id: int
-    receipt_no: str | None
-    amount: Decimal | None
-    created_at: datetime | None
 
-    class Config:
-        from_attributes = True
 
 
 class InvoiceItemUpdate(BaseModel):
