@@ -13,6 +13,7 @@ import PaymentDialog from "../components/PaymentDialog";
 import { useToast } from "../components/ui/use-toast";
 import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
+import { useReceipts } from "../api/queries";
 
 const isDev =
   import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
@@ -25,7 +26,8 @@ export default function InvoiceDetail() {
 
   const { data: students } = useStudents();
   const toast = useToast();
-  const { user, token } = useAuth();
+  const { user, token, authReady } = useAuth();
+
 
   const role = user?.role;
   const isAdminLike =
@@ -33,6 +35,7 @@ export default function InvoiceDetail() {
   const isStudentLike = role === "student" || role === "parent";
 
   const [openPayment, setOpenPayment] = useState(false);
+  const { data: allReceipts = [] } = useReceipts(authReady && !!user);
 
   const paymentMutation = useMutation({
     mutationFn: (payload: CreatePaymentPayload) =>
@@ -173,14 +176,16 @@ export default function InvoiceDetail() {
         )[0]
       : null;
 
-  const receiptHistory =
-    Array.isArray(inv.receipts) && inv.receipts.length > 0
-      ? [...inv.receipts].sort(
+  const receiptHistory = Array.isArray(allReceipts)
+    ? allReceipts
+        .filter((r: any) => r.invoice_id === inv.id)
+        .sort(
           (a: any, b: any) =>
             new Date(b.created_at).getTime() -
             new Date(a.created_at).getTime(),
         )
-      : [];      
+    : [];
+    
   // -------------------------------------------------
   // UI
   // -------------------------------------------------

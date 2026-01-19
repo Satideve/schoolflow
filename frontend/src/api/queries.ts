@@ -632,21 +632,18 @@ export function useDeleteInvoiceLineItem() {
 /* ------------------------------------------------------
    LIST RECEIPTS
 ------------------------------------------------------- */
-export function useReceipts() {
-  const { authReady, user } = useAuth();
-
+export function useReceipts(enabled: boolean = true) {
   return useQuery({
     queryKey: ["receipts"],
     queryFn: async (): Promise<Receipt[]> => {
       const { data } = await api.get("/api/v1/receipts/");
       return data;
     },
-    enabled: authReady && !!user,
+    enabled,
     refetchOnWindowFocus: false,
     retry: false,
   });
 }
-
 
 
 /* ------------------------------------------------------
