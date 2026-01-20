@@ -191,184 +191,190 @@ export default function InvoiceDetail() {
   // -------------------------------------------------
 
   return (
-    <div className="max-w-3xl mx-auto pt-6 space-y-4">
-      <div className="mb-2">
-        <Link
-          to={isAdminLike ? "/invoices" : "/my/invoices"}
-          className="text-sm text-blue-600"
-        >
-          ← Back to {isAdminLike ? "Invoices" : "My Invoices"}
-        </Link>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">
-              Invoice {inv.invoice_no ?? "-"}
-            </h1>
-
-            <span
-              className={`px-2 py-0.5 rounded text-xs font-semibold ${statusClasses()}`}
-            >
-              {paymentStatus()}
-            </span>
-          </div>
-
-          <p className="text-sm text-gray-600">
-            Invoice ID: {inv.id} · Period: {inv.period ?? "-"}
-          </p>
-          <p className="text-sm text-gray-600">Student: {studentLabel}</p>
-          <p className="text-sm text-gray-600">Due: {inv.due_date ?? "-"}</p>
-        </div>
-
-        <div className="flex gap-2">
-
-          <button
-            type="button"
-            className="inline-flex items-center px-3 py-1.5 rounded bg-gray-800 text-white text-sm hover:bg-gray-900"
-            onClick={async () => {
-              
-
-              if (!token) {
-                toast.push("Not authenticated");
-                return;
-              }
-
-              try {
-                await downloadWithAuth(
-                  `${base}/api/v1/invoices/${inv.id}/download`,
-                  `invoice-${inv.invoice_no ?? inv.id}.pdf`,
-                  token,
-                );
-                toast.push("Invoice PDF downloaded");
-              } catch {
-                toast.push("Failed to download invoice PDF");
-              }
-            }}
+    <div className="w-full max-w-5xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
+      <div className="max-w-3xl mx-auto pt-6 space-y-4">
+        <div className="mb-2">
+          <Link
+            to={isAdminLike ? "/invoices" : "/my/invoices"}
+            className="text-sm text-blue-600"
           >
-            {isStudentLike ? "View PDF" : "Download PDF"}
-          </button>
-
-
-          {balance > 0 && (
-            <button
-              className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm"
-              onClick={() => setOpenPayment(true)}
-            >
-              {isStudentLike ? "Pay Now" : "Collect Payment"}
-            </button>
-          )}
-          {isDev && balance > 0 && (
-            <button
-              className="inline-flex items-center px-3 py-1.5 rounded bg-red-600 text-white text-sm hover:bg-red-700"
-              onClick={handleSimulatePayment}
-            >
-              Simulate Final Payment (DEV)
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bg-white p-4 rounded shadow space-y-4">
-        <div>
-          <h3 className="font-semibold">Line Items</h3>
-          <table className="w-full mt-2">
-            <tbody>
-              {items.map((it: any, idx: number) => (
-                <tr key={idx} className="border-t">
-                  <td className="p-2">{itemTitle(it)}</td>
-                  <td className="p-2 text-right">
-                    {formatMoney(it.amount ?? 0)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ← Back to {isAdminLike ? "Invoices" : "My Invoices"}
+          </Link>
         </div>
 
-        <div className="text-right space-y-1">
-          <div>Total due: {formatMoney(totalDue)}</div>
-          <div>Paid: {formatMoney(paidAmount)}</div>
-          <div className="font-bold">
-            Balance: {formatMoney(balance)}
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-3 mb-2">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+              <h1 className="text-2xl font-bold">
+                Invoice {inv.invoice_no ?? "-"}
+              </h1>
+
+              <span
+                className={`px-2 py-0.5 rounded text-xs font-semibold ${statusClasses()}`}
+              >
+                {paymentStatus()}
+              </span>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Invoice ID: {inv.id} · Period: {inv.period ?? "-"}
+            </p>
+            <p className="text-sm text-gray-600">Student: {studentLabel}</p>
+            <p className="text-sm text-gray-600">Due: {inv.due_date ?? "-"}</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+
+            <button
+              type="button"
+              className="flex justify-center items-center px-3 py-1.5 rounded bg-gray-800 text-white text-sm hover:bg-gray-900 w-full sm:w-auto"
+              onClick={async () => {
+                
+
+                if (!token) {
+                  toast.push("Not authenticated");
+                  return;
+                }
+
+                try {
+                  await downloadWithAuth(
+                    `${base}/api/v1/invoices/${inv.id}/download`,
+                    `invoice-${inv.invoice_no ?? inv.id}.pdf`,
+                    token,
+                  );
+                  toast.push("Invoice PDF downloaded");
+                } catch {
+                  toast.push("Failed to download invoice PDF");
+                }
+              }}
+            >
+              {isStudentLike ? "View PDF" : "Download PDF"}
+            </button>
+
+
+            {balance > 0 && (
+              <button
+                className="flex justify-center items-center px-3 py-1.5 rounded bg-blue-600 text-white text-sm w-full sm:w-auto"
+                onClick={() => setOpenPayment(true)}
+              >
+                {isStudentLike ? "Pay Now" : "Collect Payment"}
+              </button>
+            )}
+            {isDev && balance > 0 && (
+              <button
+                className="flex justify-center items-center px-3 py-1.5 rounded bg-red-600 text-white text-sm hover:bg-red-700 w-full sm:w-auto"
+                onClick={handleSimulatePayment}
+              >
+                Simulate Final Payment (DEV)
+              </button>
+            )}
           </div>
         </div>
 
-        {/* -------------------------------------------------
-            Receipt History (metadata only)
-        ------------------------------------------------- */}
+        <div className="bg-white p-4 rounded shadow space-y-4">
+          <div>
+            <h3 className="font-semibold">Line Items</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full mt-2 min-w-[420px]">
+                <tbody>
+                  {items.map((it: any, idx: number) => (
+                    <tr key={idx} className="border-t">
+                      <td className="p-2">{itemTitle(it)}</td>
+                      <td className="p-2 text-right">
+                        {formatMoney(it.amount ?? 0)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-        <div className="border-t pt-3">
-          <h3 className="font-semibold mb-2">Receipt History</h3>
+          <div className="text-left sm:text-right space-y-1">
+            <div>Total due: {formatMoney(totalDue)}</div>
+            <div>Paid: {formatMoney(paidAmount)}</div>
+            <div className="font-bold">
+              Balance: {formatMoney(balance)}
+            </div>
+          </div>
 
-          {receiptHistory.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No receipts issued for this invoice yet.
-            </p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="p-2">Receipt No</th>
-                  <th className="p-2">Created At</th>
-                  <th className="p-2 text-right">Amount</th>
-                  <th className="p-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receiptHistory.map((r: any) => (
-                  <tr key={r.id} className="border-b last:border-b-0">
-                    <td className="p-2">{r.receipt_no ?? "-"}</td>
-                    <td className="p-2">
-                      {r.created_at
-                        ? new Date(r.created_at).toLocaleString()
-                        : "-"}
-                    </td>
-                    <td className="p-2 text-right">
-                      {formatMoney(Number(r.amount ?? 0) || 0)}
-                    </td>
-                    <td className="p-2 text-right">
-                      <button
-                        type="button"
-                        className="text-blue-600 text-sm hover:underline"
-                        onClick={async () => {
-                          if (!token) {
-                            toast.push("Not authenticated");
-                            return;
-                          }
+          {/* -------------------------------------------------
+              Receipt History (metadata only)
+          ------------------------------------------------- */}
 
-                          try {
-                            await downloadWithAuth(
-                              `${base}/api/v1/receipts/${r.id}/download`,
-                              `receipt-${r.receipt_no ?? r.id}.pdf`,
-                              token,
-                            );
-                            toast.push("Receipt PDF downloaded");
-                          } catch {
-                            toast.push("Failed to download receipt PDF");
-                          }
-                        }}
-                      >
-                        {isStudentLike ? "View" : "Download"}
-                      </button>
-                    </td>
-                  </tr>
+          <div className="border-t pt-3">
+            <h3 className="font-semibold mb-2">Receipt History</h3>
 
-                ))}
-              </tbody>
-            </table>
-          )}
+            {receiptHistory.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                No receipts issued for this invoice yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="p-2">Receipt No</th>
+                      <th className="p-2">Created At</th>
+                      <th className="p-2 text-right">Amount</th>
+                      <th className="p-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receiptHistory.map((r: any) => (
+                      <tr key={r.id} className="border-b last:border-b-0">
+                        <td className="p-2">{r.receipt_no ?? "-"}</td>
+                        <td className="p-2">
+                          {r.created_at
+                            ? new Date(r.created_at).toLocaleString()
+                            : "-"}
+                        </td>
+                        <td className="p-2 text-right">
+                          {formatMoney(Number(r.amount ?? 0) || 0)}
+                        </td>
+                        <td className="p-2 text-right">
+                          <button
+                            type="button"
+                            className="text-blue-600 text-sm hover:underline"
+                            onClick={async () => {
+                              if (!token) {
+                                toast.push("Not authenticated");
+                                return;
+                              }
+
+                              try {
+                                await downloadWithAuth(
+                                  `${base}/api/v1/receipts/${r.id}/download`,
+                                  `receipt-${r.receipt_no ?? r.id}.pdf`,
+                                  token,
+                                );
+                                toast.push("Receipt PDF downloaded");
+                              } catch {
+                                toast.push("Failed to download receipt PDF");
+                              }
+                            }}
+                          >
+                            {isStudentLike ? "View" : "Download"}
+                          </button>
+                        </td>
+                      </tr>
+
+                    ))}
+                  </tbody>
+                </table>
+              </div>  
+            )}
+          </div>
+
         </div>
 
+        <PaymentDialog
+          open={openPayment}
+          onOpenChange={setOpenPayment}
+          onSubmit={handlePaymentSubmit}
+          loading={paymentMutation.isPending}
+        />
       </div>
-
-      <PaymentDialog
-        open={openPayment}
-        onOpenChange={setOpenPayment}
-        onSubmit={handlePaymentSubmit}
-        loading={paymentMutation.isPending}
-      />
     </div>
   );
 }

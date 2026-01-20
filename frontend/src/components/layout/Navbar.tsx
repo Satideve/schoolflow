@@ -3,12 +3,16 @@ import React, { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../store/auth";
 import { useStudents } from "../../api/queries";
+import { useState } from "react";
 
 export default function Navbar() {
   const auth = useAuth();
   const user = auth.user;
   const role: string | undefined = user?.role;
   const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isAdminLike =
+  role === "admin" || role === "clerk" || role === "accountant";
 
   const isLoginPage =
     location.pathname === "/login" || location.pathname === "/register";
@@ -42,7 +46,9 @@ export default function Navbar() {
             </Link>
           </div>
         </div>
-      </header>
+        {/* 🔽 MOBILE MENU GOES HERE */}
+      </header>        
+      
     );
   }
 
@@ -50,8 +56,6 @@ export default function Navbar() {
      NORMAL NAVBAR (user is logged in)
   ----------------------------------------------------------- */
 
-  const isAdminLike =
-    role === "admin" || role === "clerk" || role === "accountant";
 
   const { data: studentsData } = useStudents();
   const students = Array.isArray(studentsData)
@@ -78,7 +82,7 @@ export default function Navbar() {
     <header className="bg-white shadow">
       <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between">
         {/* LEFT SIDE */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 min-w-0">
           <Link
             to="/"
             className="text-xl font-semibold text-slate-900 whitespace-nowrap"
@@ -87,7 +91,7 @@ export default function Navbar() {
           </Link>
 
           {/* NAV LINKS */}
-          <nav className="flex items-center gap-6">
+          <nav className="hidden sm:flex items-center gap-6">
             {isAdminLike ? (
               <>
                 <Link to="/invoices" className="text-sm text-slate-700 hover:text-black">
@@ -145,7 +149,7 @@ export default function Navbar() {
         </div>
 
         {/* RIGHT SIDE */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <div className="flex flex-col text-right">
             <span className="text-sm font-medium text-slate-800">
               {primaryLabel}
@@ -155,6 +159,16 @@ export default function Navbar() {
             </span>
           </div>
 
+          {/* HAMBURGER — MOBILE ONLY */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(v => !v)}
+            className="sm:hidden inline-flex items-center justify-center p-2 rounded-md text-slate-700 hover:bg-slate-100"
+            aria-label="Toggle navigation"
+          >
+            {mobileOpen ? "✕" : "☰"}            
+          </button>
+
           <button
             onClick={() => auth.logout()}
             className="text-sm text-red-600 hover:text-red-700 px-2 py-1"
@@ -162,7 +176,46 @@ export default function Navbar() {
             Logout
           </button>
         </div>
+
       </div>
+      {/* MOBILE MENU (mobile only) */}
+      {mobileOpen && (
+        <>
+          {/* BACKDROP */}
+          <div
+            className="sm:hidden fixed inset-0 bg-black/20 z-40"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* MENU PANEL */}
+          <div className="sm:hidden relative z-50 border-t bg-white shadow">
+            <nav className="px-4 py-3 flex flex-col gap-3">
+              {isAdminLike ? (
+                <>
+                  <Link to="/invoices" onClick={() => setMobileOpen(false)}>Invoices</Link>
+                  <Link to="/receipts" onClick={() => setMobileOpen(false)}>Receipts</Link>
+                  <Link to="/fee-assignments" onClick={() => setMobileOpen(false)}>Fee Assignments</Link>
+                  <Link to="/class-sections" onClick={() => setMobileOpen(false)}>Class Sections</Link>
+                  <Link to="/students" onClick={() => setMobileOpen(false)}>Students</Link>
+                  <Link to="/fee-components" onClick={() => setMobileOpen(false)}>Fee Components</Link>
+                  <Link to="/fee-plans" onClick={() => setMobileOpen(false)}>Fee Plans</Link>
+                  <Link to="/admin/csv" onClick={() => setMobileOpen(false)}>CSV Import</Link>
+                  <Link to="/help/admin" onClick={() => setMobileOpen(false)}>Help</Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/my/invoices" onClick={() => setMobileOpen(false)}>My Invoices</Link>
+                  <Link to="/my/receipts" onClick={() => setMobileOpen(false)}>My Receipts</Link>
+                  <Link to="/help/student" onClick={() => setMobileOpen(false)}>Help</Link>
+                </>
+              )}
+
+              <Link to="/about" onClick={() => setMobileOpen(false)}>About</Link>
+            </nav>
+          </div>
+        </>
+      )}
+
     </header>
   );
 }
