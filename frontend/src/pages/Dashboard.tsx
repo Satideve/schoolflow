@@ -11,6 +11,8 @@ import {
 import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
 import { formatMoney } from "../lib/utils";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 /* ------------------------------------------------------------------
    ADMIN / ACCOUNTANT DASHBOARD
@@ -494,6 +496,13 @@ const StudentParentDashboard: React.FC<{ role: string | undefined }> = ({
 
 const Dashboard: React.FC = () => {
   const { user, authReady } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (authReady && user) {
+      queryClient.invalidateQueries();
+    }
+  }, [authReady, user, queryClient]);
 
   if (!authReady) {
     return (
