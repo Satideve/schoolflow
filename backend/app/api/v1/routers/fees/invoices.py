@@ -22,7 +22,8 @@ from app.schemas.fee.invoice import (
 
 from app.services.fee.fees_service import FeesService
 from app.services.payments.fake_adapter import FakePaymentAdapter
-from app.services.messaging.fake_adapter import FakeMessagingAdapter
+from app.services.messaging import get_messaging_service
+# from app.services.messaging.fake_adapter import FakeMessagingAdapter
 from app.repositories.invoice_repo import (
     get_invoice as repo_get_invoice,
     list_invoices as repo_list_invoices,
@@ -40,6 +41,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.models.fee.fee_invoice_item import FeeInvoiceItem
+
+from app.services.messaging.email_sender import send_document_email
+from app.services.pdf.renderer import render_invoice_html
+
 
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
@@ -175,7 +180,7 @@ def create_invoice(
     svc = FeesService(
         db=db,
         payment_gateway=FakePaymentAdapter(),
-        messaging=FakeMessagingAdapter(),
+        messaging=get_messaging_service(),
     )
 
     try:
@@ -382,6 +387,61 @@ def download_invoice(
         media_type="application/pdf",
         filename=filename,
     )
+
+class InvoiceEmailRequest(BaseModel):
+    to_email: str
+
+@router.post(
+    "/{invoice_id}/email",
+    status_code=status.HTTP_200_OK,
+    summary="Email invoice (HTML only)",
+)
+def email_invoice(
+    invoice_id: int,
+    payload: InvoiceEmailRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    logger.info(
+        f"action=email_invoice request_id={request.state.request_id} "
+        f"user_id={current_user.id} invoice_id={invoice_id} to={payload.to_email}"
+    )
+
+    inv = repo_get_invoice(db, invoice_id)
+    if not inv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found",
+        )
+
+    # RBAC: identical to download_invoice
+    if current_user.role not in ("admin", "clerk"):
+        if current_user.student_id is None or current_user.student_id != inv.student_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized",
+            )
+
+    ctx = load_invoice_context(inv.id, db)
+
+    html = render_invoice_html(ctx)
+
+    result = send_document_email(
+        to_email=payload.to_email,
+        subject=f"Invoice {inv.invoice_no}",
+        body_html=html,
+    )
+
+    if result.get("status") != "sent":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get("error", "Failed to send invoice email"),
+        )
+
+    return {"status": "sent"}
+
+
 
 # ---------------------------------------------------------------------------
 #                ADMIN: INVOICE LINE-ITEM CRUD (fee_invoice_item)

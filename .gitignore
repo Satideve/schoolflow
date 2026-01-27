@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 # Ignore generated PDFs
 *.pdf
+.env
+backend/.env

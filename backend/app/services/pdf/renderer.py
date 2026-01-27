@@ -46,6 +46,14 @@ env.globals.update(
     }
 )
 
+def _render_template_to_html(template_path: str, context: Dict) -> str:
+    """
+    Render a Jinja template to HTML only.
+    Used for email delivery and previews.
+    """
+    tpl = env.get_template(template_path)
+    return tpl.render(**context)
+
 
 def _find_wkhtmltopdf(preferred: Optional[str] = None) -> str:
     """
@@ -221,3 +229,16 @@ def render_invoice_pdf(context: Dict, output_path: Optional[str], options: Optio
     context variables and won't get the wrong template (receipt) by accident.
     """
     return _render_template_to_pdf("invoices/invoice.html", context, output_path, options)
+
+def render_invoice_html(context: Dict) -> str:
+    """
+    Render invoice HTML without generating a PDF.
+    """
+    return _render_template_to_html("invoices/invoice.html", context)
+
+
+def render_receipt_html(context: Dict) -> str:
+    """
+    Render receipt HTML without generating a PDF.
+    """
+    return _render_template_to_html("receipts/receipt.html", context)
