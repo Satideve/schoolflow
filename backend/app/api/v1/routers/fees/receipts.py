@@ -18,13 +18,19 @@ from app.models.fee.fee_invoice import FeeInvoice as Invoice
 from app.core.config import settings
 from app.services.messaging.email_sender import send_document_email
 from app.services.pdf.context_loader import load_receipt_context
-from app.services.pdf.renderer import render_receipt_html
+from app.services.pdf.renderer import (
+    render_receipt_html,
+    render_receipt_pdf,
+)
+
 
 import logging
 from fastapi import Request
 from pydantic import BaseModel
 
 from app.models.user import User
+import tempfile
+
 
 
 router = APIRouter(
@@ -341,11 +347,22 @@ def email_receipt(
 
     html = render_receipt_html(ctx)
 
+    html = render_receipt_html(ctx)
+
+    # Generate receipt PDF on-demand (ephemeral)
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+        render_receipt_pdf(ctx, tmp.name)
+        tmp.seek(0)
+        pdf_bytes = tmp.read()
+
     result = send_document_email(
         to_email=payload.to_email,
         subject=f"Receipt {ctx.get('receipt_no')}",
         body_html=html,
+        attachment=pdf_bytes,
+        attachment_filename=f"Receipt-{ctx.get('receipt_no')}.pdf",
     )
+
 
     if result.get("status") != "sent":
         raise HTTPException(

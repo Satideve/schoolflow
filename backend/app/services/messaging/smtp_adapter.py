@@ -20,13 +20,15 @@ class SMTPMessagingAdapter(MessagingInterface):
         attachment: bytes | None = None,
         attachment_filename: str | None = None,
     ) -> Dict[str, Any]:
-        msg = MIMEMultipart("alternative")
+        msg = MIMEMultipart("mixed")
         msg["From"] = settings.smtp_from
         msg["To"] = to_email
         msg["Subject"] = subject
 
-        html_part = MIMEText(body_html, "html")
-        msg.attach(html_part)
+        alt = MIMEMultipart("alternative")
+        alt.attach(MIMEText(body_html, "html"))
+        msg.attach(alt)
+
 
         if attachment and attachment_filename:
             part = MIMEApplication(attachment)
