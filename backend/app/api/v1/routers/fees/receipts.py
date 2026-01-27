@@ -16,11 +16,22 @@ from app.models.fee.receipt import Receipt
 from app.models.fee.payment import Payment
 from app.models.fee.fee_invoice import FeeInvoice as Invoice
 from app.core.config import settings
+from app.services.messaging.email_sender import send_document_email
+from app.services.pdf.context_loader import load_receipt_context
+from app.services.pdf.renderer import render_receipt_html
+
+import logging
+from fastapi import Request
+from pydantic import BaseModel
+
+from app.models.user import User
+
 
 router = APIRouter(
     prefix="/api/v1/receipts",
     tags=["fees", "receipts"],
 )
+logger = logging.getLogger("app.audit.receipts")
 
 
 def _build_receipt_out(db: Session, receipt: Receipt) -> ReceiptOut:
@@ -305,6 +316,44 @@ def get_receipt(
 
     _enforce_role_or_ownership(db, current_user, receipt)
     return _build_receipt_out(db, receipt)
+
+class ReceiptEmailRequest(BaseModel):
+    to_email: str
+
+@router.post(
+    "/{receipt_id}/email",
+    status_code=status.HTTP_200_OK,
+    summary="Email receipt (HTML only)",
+)
+def email_receipt(
+    receipt_id: int,
+    payload: ReceiptEmailRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    logger.info(
+        f"action=email_receipt request_id={request.state.request_id} "
+        f"user_id={current_user.id} receipt_id={receipt_id} to={payload.to_email}"
+    )
+
+    ctx = load_receipt_context(receipt_id, db)
+
+    html = render_receipt_html(ctx)
+
+    result = send_document_email(
+        to_email=payload.to_email,
+        subject=f"Receipt {ctx.get('receipt_no')}",
+        body_html=html,
+    )
+
+    if result.get("status") != "sent":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=result.get("error", "Failed to send receipt email"),
+        )
+
+    return {"status": "sent"}
 
 
 @router.get("/{receipt_id}/download", response_class=FileResponse)
