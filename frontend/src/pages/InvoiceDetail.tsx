@@ -14,6 +14,9 @@ import { useToast } from "../components/ui/use-toast";
 import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
 import { useReceipts } from "../api/queries";
+import { emailInvoice } from "../api/queries";
+import { emailReceipt } from "../api/queries";
+
 
 const isDev =
   import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
@@ -144,6 +147,18 @@ export default function InvoiceDetail() {
 
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+  async function handleEmailInvoice() {
+    const toEmail = window.prompt("Send invoice to email:");
+    if (!toEmail) return;
+
+    try {
+      await emailInvoice(inv.id, toEmail);
+      toast.push("Invoice emailed successfully");
+    } catch (err: any) {
+      toast.push(err?.message || "Failed to email invoice");
+    }
+  }
+
   function handleSimulatePayment() {
     if (!inv || balance <= 0) return;
 
@@ -152,6 +167,18 @@ export default function InvoiceDetail() {
       provider: "manual",
       note: "DEV simulated final payment",
     });
+  }
+
+  async function handleEmailReceipt(receiptId: number) {
+    const toEmail = window.prompt("Send receipt to email:");
+    if (!toEmail) return;
+
+    try {
+      await emailReceipt(receiptId, toEmail);
+      toast.push("Receipt emailed successfully");
+    } catch (err: any) {
+      toast.push(err?.message || "Failed to email receipt");
+    }
   }
 
 
@@ -251,6 +278,16 @@ export default function InvoiceDetail() {
               {isStudentLike ? "View PDF" : "Download PDF"}
             </button>
 
+            {isAdminLike && (
+              <button
+                type="button"
+                className="flex justify-center items-center px-3 py-1.5 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 w-full sm:w-auto"
+                onClick={handleEmailInvoice}
+              >
+                Email Invoice
+              </button>
+            )}
+
 
             {balance > 0 && (
               <button
@@ -332,7 +369,8 @@ export default function InvoiceDetail() {
                         <td className="p-2 text-right">
                           {formatMoney(Number(r.amount ?? 0) || 0)}
                         </td>
-                        <td className="p-2 text-right">
+                        
+                        <td className="p-2 text-right space-x-3">
                           <button
                             type="button"
                             className="text-blue-600 text-sm hover:underline"
@@ -356,7 +394,18 @@ export default function InvoiceDetail() {
                           >
                             {isStudentLike ? "View" : "Download"}
                           </button>
+
+                          {isAdminLike && (
+                            <button
+                              type="button"
+                              className="text-indigo-600 text-sm hover:underline"
+                              onClick={() => handleEmailReceipt(r.id)}
+                            >
+                              Email
+                            </button>
+                          )}
                         </td>
+
                       </tr>
 
                     ))}

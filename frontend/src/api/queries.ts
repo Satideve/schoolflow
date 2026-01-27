@@ -667,3 +667,25 @@ export function useRegisterPortalUser() {
     },
   });
 }
+
+export async function emailInvoice(
+  invoiceId: number | string,
+  toEmail: string
+): Promise<{ status: string }> {
+  const { data } = await api.post(
+    `/api/v1/invoices/${invoiceId}/email`,
+    { to_email: toEmail }
+  );
+  return data;
+}
+
+export async function emailReceipt(
+  receiptId: number | string,
+  toEmail: string
+): Promise<{ status: string }> {
+  const { data } = await api.post(
+    `/api/v1/receipts/${receiptId}/email`,
+    { to_email: toEmail }
+  );
+  return data;
+}

@@ -88,6 +88,39 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
 
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+  async function handleEmailReceipt(receiptId: number) {
+    if (!token) {
+      alert("Not authenticated");
+      return;
+    }
+
+    const toEmail = window.prompt("Send receipt to email:");
+    if (!toEmail) return;
+
+    try {
+      const res = await fetch(
+        `${base}/api/v1/receipts/${receiptId}/email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ to_email: toEmail }),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed");
+      }
+
+      alert("Receipt emailed successfully");
+    } catch {
+      alert("Failed to email receipt");
+    }
+  }
+
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Receipts</h1>
@@ -115,10 +148,11 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
                   {formatMoney(Number(r.amount != null ? r.amount : 0) || 0)}
                 </td>
                 <td className="p-2">{formatDateTime(r.created_at)}</td>
-                <td className="p-2">
+
+                <td className="p-2 space-x-3">
                   <button
                     type="button"
-                    className="text-blue-600"
+                    className="text-blue-600 hover:underline"
                     onClick={async () => {
                       try {
                         await downloadWithAuth(
@@ -134,7 +168,15 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
                     Download
                   </button>
 
+                  <button
+                    type="button"
+                    className="text-indigo-600 hover:underline"
+                    onClick={() => handleEmailReceipt(r.id)}
+                  >
+                    Email
+                  </button>
                 </td>
+
               </tr>
             ))}
           </tbody>
