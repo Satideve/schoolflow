@@ -44,7 +44,7 @@ from app.models.fee.fee_invoice_item import FeeInvoiceItem
 
 from app.services.messaging.email_sender import send_document_email
 from app.services.pdf.renderer import render_invoice_html
-
+import tempfile
 
 
 router = APIRouter(prefix="/api/v1/invoices", tags=["invoices"])
@@ -427,11 +427,20 @@ def email_invoice(
 
     html = render_invoice_html(ctx)
 
+    # Generate PDF in a temp file, then read bytes
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as tmp:
+        render_invoice_pdf(ctx, tmp.name)
+        tmp.seek(0)
+        pdf_bytes = tmp.read()
+
     result = send_document_email(
         to_email=payload.to_email,
         subject=f"Invoice {inv.invoice_no}",
         body_html=html,
+        attachment=pdf_bytes,
+        attachment_filename=f"Invoice-{inv.invoice_no}.pdf",
     )
+
 
     if result.get("status") != "sent":
         raise HTTPException(

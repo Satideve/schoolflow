@@ -7,10 +7,19 @@ from typing import Dict, Any
 
 from app.core.config import settings
 from app.services.messaging.interface import MessagingInterface
+from email.mime.application import MIMEApplication
+
 
 
 class SMTPMessagingAdapter(MessagingInterface):
-    def send_email(self, to_email: str, subject: str, body_html: str) -> Dict[str, Any]:
+    def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        body_html: str,
+        attachment: bytes | None = None,
+        attachment_filename: str | None = None,
+    ) -> Dict[str, Any]:
         msg = MIMEMultipart("alternative")
         msg["From"] = settings.smtp_from
         msg["To"] = to_email
@@ -18,6 +27,14 @@ class SMTPMessagingAdapter(MessagingInterface):
 
         html_part = MIMEText(body_html, "html")
         msg.attach(html_part)
+
+        if attachment and attachment_filename:
+            part = MIMEApplication(attachment)
+            part.add_header(
+                "Content-Disposition",
+                f'attachment; filename="{attachment_filename}"',
+            )
+            msg.attach(part)
 
         try:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
