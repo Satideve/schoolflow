@@ -20,12 +20,11 @@ class SMTPMessagingAdapter(MessagingInterface):
         attachment: bytes | None = None,
         attachment_filename: str | None = None,
     ) -> Dict[str, Any]:
-        # Safety guard:
-        # - dev  → allow SMTP (MailHog)
-        # - prod → allow SMTP (real)
-        # - else → dry-run only
-        # Safety guard: only dev or prod allowed
+        # -------------------------------
+        # Mode-authoritative SMTP safety
+        # -------------------------------
         if settings.smtp_mode == "prod":
+            # Production: real SMTP is REQUIRED
             if not settings.smtp_host:
                 raise RuntimeError(
                     "SMTP_MODE=prod but SMTP_HOST is not configured"
@@ -35,6 +34,15 @@ class SMTPMessagingAdapter(MessagingInterface):
                 raise RuntimeError(
                     "SMTP_MODE=prod but SMTP_USER / SMTP_PASSWORD are not configured"
                 )
+
+        else:
+            # Dev mode: NEVER allow real SMTP credentials
+            # Force MailHog-style behavior
+            if settings.smtp_host not in ("localhost", "127.0.0.1"):
+                raise RuntimeError(
+                    "SMTP_MODE=dev but SMTP_HOST is not localhost"
+                )
+
 
             
         msg = MIMEMultipart("mixed")
@@ -57,9 +65,15 @@ class SMTPMessagingAdapter(MessagingInterface):
 
         try:
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-                if settings.smtp_user and settings.smtp_password:
+
+                if settings.smtp_mode == "prod":
                     server.starttls()
-                    server.login(settings.smtp_user, settings.smtp_password)
+                    server.login(
+                        settings.smtp_user,
+                        settings.smtp_password,
+                    )
+
+                # dev mode intentionally skips TLS + auth
 
                 server.sendmail(
                     from_addr=settings.smtp_from,
