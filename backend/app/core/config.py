@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     smtp_user: Optional[str] = Field(None, env="SMTP_USER")
     smtp_password: Optional[str] = Field(None, env="SMTP_PASSWORD")
     smtp_from: str = Field("school@schoolflow.local", env="SMTP_FROM")
+    smtp_mode: str = Field("dev", env="SMTP_MODE")  # dev | prod
 
     # Payment Providers
     provider_mode: str = Field("fake", env="PROVIDER_MODE")
@@ -114,6 +115,12 @@ class Settings(BaseSettings):
     def parse_cors_headers(cls, v) -> List[str]:
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
+        return v
+
+    @field_validator("smtp_mode")
+    def validate_smtp_mode(cls, v: str) -> str:
+        if v not in ("dev", "prod"):
+            raise ValueError("SMTP_MODE must be 'dev' or 'prod'")
         return v
 
     # -------- Helpers --------

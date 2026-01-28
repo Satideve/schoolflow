@@ -6,16 +6,20 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useInvoice, useStudents } from "../api/queries";
 import { formatMoney } from "../lib/utils";
 import { createPaymentOrder, CreatePaymentPayload } from "../api/payments";
 import PaymentDialog from "../components/PaymentDialog";
 import { useToast } from "../components/ui/use-toast";
 import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
-import { useReceipts } from "../api/queries";
-import { emailInvoice } from "../api/queries";
-import { emailReceipt } from "../api/queries";
+import {
+  useInvoice,
+  useStudents,
+  useReceipts,
+  emailInvoice,
+  emailReceipt,
+} from "../api/queries";
+
 
 
 const isDev =
@@ -30,6 +34,8 @@ export default function InvoiceDetail() {
   const { data: students } = useStudents();
   const toast = useToast();
   const { user, token, authReady } = useAuth();
+  const base =
+    import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 
   const role = user?.role;
@@ -145,8 +151,6 @@ export default function InvoiceDetail() {
     );
   }
 
-  const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-
   async function handleEmailInvoice() {
     const toEmail = window.prompt("Send invoice to email:");
     if (!toEmail) return;
@@ -158,6 +162,7 @@ export default function InvoiceDetail() {
       toast.push(err?.message || "Failed to email invoice");
     }
   }
+
 
   function handleSimulatePayment() {
     if (!inv || balance <= 0) return;
@@ -180,7 +185,6 @@ export default function InvoiceDetail() {
       toast.push(err?.message || "Failed to email receipt");
     }
   }
-
 
   function handlePaymentSubmit(values: {
     amount: number;

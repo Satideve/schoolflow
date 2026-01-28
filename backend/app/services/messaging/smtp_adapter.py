@@ -20,6 +20,23 @@ class SMTPMessagingAdapter(MessagingInterface):
         attachment: bytes | None = None,
         attachment_filename: str | None = None,
     ) -> Dict[str, Any]:
+        # Safety guard:
+        # - dev  → allow SMTP (MailHog)
+        # - prod → allow SMTP (real)
+        # - else → dry-run only
+        # Safety guard: only dev or prod allowed
+        if settings.smtp_mode == "prod":
+            if not settings.smtp_host:
+                raise RuntimeError(
+                    "SMTP_MODE=prod but SMTP_HOST is not configured"
+                )
+
+            if not settings.smtp_user or not settings.smtp_password:
+                raise RuntimeError(
+                    "SMTP_MODE=prod but SMTP_USER / SMTP_PASSWORD are not configured"
+                )
+
+            
         msg = MIMEMultipart("mixed")
         msg["From"] = settings.smtp_from
         msg["To"] = to_email
