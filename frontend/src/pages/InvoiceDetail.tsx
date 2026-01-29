@@ -24,6 +24,8 @@ import {
 
 const isDev =
   import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
+const enableEmail =
+  import.meta.env.VITE_ENABLE_EMAIL === "true";
 
 
 export default function InvoiceDetail() {
@@ -282,7 +284,7 @@ export default function InvoiceDetail() {
               {isStudentLike ? "View PDF" : "Download PDF"}
             </button>
 
-            {isAdminLike && (
+            {isAdminLike && enableEmail && (
               <button
                 type="button"
                 className="flex justify-center items-center px-3 py-1.5 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 w-full sm:w-auto"
@@ -399,7 +401,7 @@ export default function InvoiceDetail() {
                             {isStudentLike ? "View" : "Download"}
                           </button>
 
-                          {isAdminLike && (
+                          {isAdminLike && enableEmail && (
                             <button
                               type="button"
                               className="text-indigo-600 text-sm hover:underline"

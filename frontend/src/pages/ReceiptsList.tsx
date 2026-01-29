@@ -9,6 +9,10 @@ import { formatMoney } from "../lib/utils";
 import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
 
+const enableEmail =
+  import.meta.env.VITE_ENABLE_EMAIL === "true";
+
+
 export default function ReceiptsList() {
   const { authReady, token } = useAuth();
 
@@ -168,13 +172,15 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
                     Download
                   </button>
 
-                  <button
-                    type="button"
-                    className="text-indigo-600 hover:underline"
-                    onClick={() => handleEmailReceipt(r.id)}
-                  >
-                    Email
-                  </button>
+                  {enableEmail && (
+                    <button
+                      type="button"
+                      className="text-indigo-600 hover:underline"
+                      onClick={() => handleEmailReceipt(r.id)}
+                    >
+                      Email
+                    </button>
+                  )}
                 </td>
 
               </tr>
