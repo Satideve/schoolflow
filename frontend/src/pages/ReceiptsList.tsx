@@ -10,7 +10,7 @@ import { useAuth } from "../store/auth";
 import { downloadWithAuth } from "../lib/download";
 
 const enableEmail =
-  import.meta.env.VITE_ENABLE_EMAIL === "true";
+  String(import.meta.env.VITE_ENABLE_EMAIL) === "true";
 
 
 export default function ReceiptsList() {

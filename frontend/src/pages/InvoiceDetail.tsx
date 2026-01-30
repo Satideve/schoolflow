@@ -25,7 +25,7 @@ import {
 const isDev =
   import.meta.env.DEV || import.meta.env.VITE_ENV === "development";
 const enableEmail =
-  import.meta.env.VITE_ENABLE_EMAIL === "true";
+  String(import.meta.env.VITE_ENABLE_EMAIL) === "true";
 
 
 export default function InvoiceDetail() {
