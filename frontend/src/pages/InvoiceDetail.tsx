@@ -219,13 +219,6 @@ export default function InvoiceDetail() {
         )
     : [];
 
-  // TEMP DEBUG — REMOVE AFTER CONFIRMATION
-  const __debugEnv = {
-    enableEmail,
-    role,
-    isAdminLike,
-    rawEnableEmail: import.meta.env.VITE_ENABLE_EMAIL,
-  };    
 
   // -------------------------------------------------
   // UI
