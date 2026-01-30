@@ -218,13 +218,28 @@ export default function InvoiceDetail() {
             new Date(a.created_at).getTime(),
         )
     : [];
-    
+
+  // TEMP DEBUG — REMOVE AFTER CONFIRMATION
+  const __debugEnv = {
+    enableEmail,
+    role,
+    isAdminLike,
+    rawEnableEmail: import.meta.env.VITE_ENABLE_EMAIL,
+  };    
+
   // -------------------------------------------------
   // UI
   // -------------------------------------------------
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
+
+      {/* TEMP DEBUG — REMOVE AFTER CONFIRMATION */}
+      <div className="mb-2 p-2 text-xs bg-yellow-100 text-yellow-900 rounded">
+        <strong>DEBUG:</strong>{" "}
+        {JSON.stringify(__debugEnv)}
+      </div>
+
       <div className="max-w-3xl mx-auto pt-6 space-y-4">
         <div className="mb-2">
           <Link
