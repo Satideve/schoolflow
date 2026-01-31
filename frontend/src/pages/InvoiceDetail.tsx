@@ -131,6 +131,12 @@ export default function InvoiceDetail() {
     inv.student?.name ??
     `Student #${inv.student_id}`;
 
+  // Prefill email from student portal account (if exists)
+  const studentPortalEmail =
+    students?.find((s: any) => s.id === inv.student_id)
+      ?.portal_user_email ?? "";
+
+  
   // -------------------------------------------------
   // Line items
   // -------------------------------------------------
@@ -154,7 +160,11 @@ export default function InvoiceDetail() {
   }
 
   async function handleEmailInvoice() {
-    const toEmail = window.prompt("Send invoice to email:");
+    const toEmail = window.prompt(
+      "Send invoice to email:",
+      studentPortalEmail || ""
+    );
+
     if (!toEmail) return;
 
     try {
@@ -177,7 +187,11 @@ export default function InvoiceDetail() {
   }
 
   async function handleEmailReceipt(receiptId: number) {
-    const toEmail = window.prompt("Send receipt to email:");
+    const toEmail = window.prompt(
+      "Send receipt to email:",
+      studentPortalEmail || ""
+    );
+
     if (!toEmail) return;
 
     try {
