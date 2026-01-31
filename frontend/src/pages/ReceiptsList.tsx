@@ -81,6 +81,15 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
     return student?.name ?? `Student #${inv.student_id}`;
   }
 
+  function findStudentEmailForReceipt(r: any): string {
+  if (!r || r.invoice_id == null) return "";
+  const inv = invoiceById.get(r.invoice_id);
+  if (!inv || inv.student_id == null) return "";
+  const student = studentById.get(inv.student_id);
+  return student?.portal_user_email ?? "";
+}
+
+
   function formatDateTime(value?: string | null) {
     if (!value) return "-";
     try {
@@ -98,7 +107,13 @@ const receipts = Array.isArray(receiptsData) ? receiptsData : [];
       return;
     }
 
-    const toEmail = window.prompt("Send receipt to email:");
+    const toEmail = window.prompt(
+      "Send receipt to email:",
+      findStudentEmailForReceipt(
+        receipts.find((r: any) => r.id === receiptId)
+      ) || ""
+    );
+
     if (!toEmail) return;
 
     try {
