@@ -11,6 +11,7 @@ import {
 } from "../api/queries";
 import { useForm } from "react-hook-form";
 import { useToast } from "../components/ui/use-toast";
+import { useAuth } from "../store/auth";
 
 type FormValues = {
   name: string;
@@ -49,6 +50,7 @@ export default function Students() {
   const [resetPassword, setResetPassword] = React.useState("");
   const [showResetPassword, setShowResetPassword] = React.useState(false);
   const [resetEmail, setResetEmail] = React.useState("");
+  const { token } = useAuth();
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -251,19 +253,16 @@ const startPortalUserCreate = (st: any) => {
       return;
     }
 
-    const base = import.meta.env.VITE_API_BASE;
-
     try {
-      await fetch(
+      const base = import.meta.env.VITE_API_BASE;
+
+      const res = await fetch(
         `${base}/api/v1/auth/admin/reset-student-password`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${document.cookie
-              .split("; ")
-              .find((row) => row.startsWith("access_token="))
-              ?.split("=")[1]}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             student_id: resetStudent.id,
@@ -272,6 +271,10 @@ const startPortalUserCreate = (st: any) => {
           }),
         }
       );
+
+      if (!res.ok) {
+        throw new Error("Reset failed");
+      }
 
       toast.push("Email and password updated.");
       await queryClient.invalidateQueries({ queryKey: ["students"] });
@@ -286,6 +289,7 @@ const startPortalUserCreate = (st: any) => {
       toast.push("Failed to reset credentials.");
     }
   };
+
 
   return (
     <div className="space-y-6">
