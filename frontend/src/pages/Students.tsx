@@ -1,5 +1,6 @@
 /* C:\coding_projects\dev\schoolflow\frontend\src\pages\Students.tsx */
 import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useStudents,
   useClassSections,
@@ -26,6 +27,7 @@ export default function Students() {
   const registerPortalUser = useRegisterPortalUser();
   const { register, handleSubmit, reset } = useForm<FormValues>();
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   const sections = Array.isArray(sectionsData) ? sectionsData : sectionsData ?? [];
   const students = Array.isArray(studentsData) ? studentsData : studentsData ?? [];
@@ -42,6 +44,11 @@ export default function Students() {
   const [portalEmail, setPortalEmail] = React.useState("");
   const [portalPassword, setPortalPassword] = React.useState("");
   const [showPortalPassword, setShowPortalPassword] = React.useState(false);
+  const [resetModalOpen, setResetModalOpen] = React.useState(false);
+  const [resetStudent, setResetStudent] = React.useState<any>(null);
+  const [resetPassword, setResetPassword] = React.useState("");
+  const [showResetPassword, setShowResetPassword] = React.useState(false);
+  const [resetEmail, setResetEmail] = React.useState("");
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -171,13 +178,14 @@ export default function Students() {
   };
 
   // Start portal user creation for a given student
-  const startPortalUserCreate = (st: any) => {
-    setPortalStudent(st);
-    // Always start with blank fields (no reuse of previous values)
-    setPortalEmail("");
-    setPortalPassword("");
-    setPortalModalOpen(true);
-  };
+const startPortalUserCreate = (st: any) => {
+  setPortalStudent(st);
+  setPortalEmail(st.portal_user_email ?? "");
+  setPortalPassword("");
+  setShowPortalPassword(false);
+  setPortalModalOpen(true);
+};
+
 
   // Handle actual portal user creation
   const handleCreatePortalUser = async () => {
@@ -229,6 +237,45 @@ export default function Students() {
       } catch {
         console.log(msg);
       }
+    }
+  };
+
+  const handleResetPortalUser = async () => {
+    if (!resetStudent) return;
+
+    const email = resetEmail.trim();
+    const pwd = resetPassword.trim();
+
+    if (!email || !pwd) {
+      toast.push("Email and password are required.");
+      return;
+    }
+
+    try {
+      await fetch("/api/v1/auth/admin/reset-student-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          student_id: resetStudent.id,
+          email,
+          new_password: pwd,
+        }),
+      });
+
+      toast.push("Email and password updated.");
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
+
+      setResetModalOpen(false);
+      setResetStudent(null);
+      setResetEmail("");
+      setResetPassword("");
+      setShowResetPassword(false);
+    } catch (err) {
+      console.error(err);
+      toast.push("Failed to reset credentials.");
     }
   };
 
@@ -361,11 +408,28 @@ export default function Students() {
                           sectionLabel(st.class_section_id)
                         )}
                       </td>
+
                       <td className="p-2">
                         {st.portal_user_email ? (
-                          <span className="inline-flex items-center rounded-full border border-green-100 bg-green-50 px-2 py-0.5 text-xs text-green-700">
-                            {st.portal_user_email}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center rounded-full border border-green-100 bg-green-50 px-2 py-0.5 text-xs text-green-700">
+                              {st.portal_user_email}
+                            </span>
+
+                            <button
+                              type="button"
+                              className="text-xs text-indigo-600 hover:underline text-left"
+                              onClick={() => {
+                                setResetStudent(st);
+                                setResetEmail(st.portal_user_email || "");
+                                setResetPassword("");
+                                setShowResetPassword(false);
+                                setResetModalOpen(true);
+                              }}
+                            >
+                              Reset Password
+                            </button>
+                          </div>
                         ) : (
                           <div className="flex flex-col gap-1">
                             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
@@ -490,6 +554,66 @@ export default function Students() {
                 disabled={(registerPortalUser as any).isPending}
               >
                 {(registerPortalUser as any).isPending ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {resetModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded shadow p-6 w-80 space-y-3">
+            <h3 className="text-lg font-semibold">Reset Password</h3>
+
+            <p className="text-sm text-slate-600">
+              Student: {resetStudent?.name}
+            </p>
+
+            <input
+              className="border rounded px-3 py-2 text-sm w-full"
+              placeholder="Student email"
+              type="email"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              autoComplete="off"
+            />
+
+            <div className="space-y-1">
+              <input
+                className="border rounded px-3 py-2 text-sm w-full"
+                placeholder="New password"
+                type={showResetPassword ? "text" : "password"}
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={showResetPassword}
+                  onChange={(e) => setShowResetPassword(e.target.checked)}
+                />
+                Show password
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                className="px-3 py-1.5 rounded bg-slate-300 text-slate-800 text-sm"
+                onClick={() => {
+                  setResetModalOpen(false);
+                  setResetStudent(null);
+                  setResetPassword("");
+                  setShowResetPassword(false);
+                }}
+              >
+                Close
+              </button>
+
+              <button
+                className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm"
+                onClick={handleResetPortalUser}
+              >
+                Reset
               </button>
             </div>
           </div>

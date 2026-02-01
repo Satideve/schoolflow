@@ -12,6 +12,7 @@ from typing import Optional
 
 from app.schemas.user import UserCreate, UserOut
 from app.schemas.auth import Token
+from app.schemas.auth_admin import AdminResetPassword
 from app.db.session import get_db
 from app.models.user import User
 from app.core.config import settings
@@ -343,3 +344,48 @@ def login(
     }
 
     return response_payload
+
+@router.post(
+    "/admin/reset-student-password",
+    status_code=status.HTTP_200_OK,
+)
+def admin_reset_student_password(
+    payload: AdminResetPassword,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # 1️⃣ Ensure admin
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can reset passwords",
+        )
+
+    # 2️⃣ Find user linked to student
+    user = (
+        db.query(User)
+        .filter(User.student_id == payload.student_id)
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No portal user linked to this student",
+        )
+
+    # 3️⃣ Reset password
+    user.hashed_password = get_password_hash(payload.new_password)
+
+    # update email if changed
+    if payload.email and payload.email != user.email:
+        user.email = payload.email
+
+
+    db.commit()
+
+    return {
+        "message": "Password reset successful",
+        "student_id": payload.student_id,
+        "user_email": user.email,
+    }
