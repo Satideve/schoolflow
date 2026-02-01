@@ -41,6 +41,7 @@ export default function Students() {
   const [portalStudent, setPortalStudent] = React.useState<any>(null);
   const [portalEmail, setPortalEmail] = React.useState("");
   const [portalPassword, setPortalPassword] = React.useState("");
+  const [showPortalPassword, setShowPortalPassword] = React.useState(false);
 
   const onSubmit = async (values: FormValues) => {
     try {
@@ -455,13 +456,20 @@ export default function Students() {
             <input
               className="border rounded px-3 py-2 text-sm w-full"
               placeholder="Password"
-              type="password"
+              type={showPortalPassword ? "text" : "password"}
               value={portalPassword}
               onChange={(e) => setPortalPassword(e.target.value)}
               autoComplete="new-password"
               name="portal_user_password"
             />
 
+            <button
+              type="button"
+              onClick={() => setShowPortalPassword((v) => !v)}
+              className="text-xs text-blue-600 hover:underline text-left"
+            >
+              {showPortalPassword ? "Hide password" : "Show password"}
+            </button>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
