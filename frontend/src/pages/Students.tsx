@@ -251,19 +251,27 @@ const startPortalUserCreate = (st: any) => {
       return;
     }
 
+    const base = import.meta.env.VITE_API_BASE;
+
     try {
-      await fetch("/api/v1/auth/admin/reset-student-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          student_id: resetStudent.id,
-          email,
-          new_password: pwd,
-        }),
-      });
+      await fetch(
+        `${base}/api/v1/auth/admin/reset-student-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${document.cookie
+              .split("; ")
+              .find((row) => row.startsWith("access_token="))
+              ?.split("=")[1]}`,
+          },
+          body: JSON.stringify({
+            student_id: resetStudent.id,
+            email,
+            new_password: pwd,
+          }),
+        }
+      );
 
       toast.push("Email and password updated.");
       await queryClient.invalidateQueries({ queryKey: ["students"] });
