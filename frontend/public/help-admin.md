@@ -560,3 +560,331 @@ These definitions are **non-negotiable** and must be respected everywhere (DB, A
 | **Paid Amount** | Sum of all payments |
 | **Balance** | `total_due - paid_amount` |
 ---------------------------------------
+
+# Another updated version
+
+ 📘 SchoolFlow – Admin / Accounts Help
+
+This guide is for **school admins, clerks, and accountants** using **SchoolFlow** to manage school fees.
+
+You do **not** need any technical or coding knowledge to use SchoolFlow.
+
+This document explains:
+
+- How SchoolFlow is structured
+- The **correct order** to set up and use the system
+- How to **import data using CSV files**
+- How to **manage data via the web interface**
+- How to **create invoices, record payments, and download PDFs**
+- How to **email invoices and receipts**
+- How to **create and manage student portal accounts**
+- How admins can **reset student email and password**
+- Critical accounting definitions that must **never change**
+
+---
+
+## 1. How SchoolFlow Is Structured
+
+SchoolFlow follows standard school accounting logic.
+
+### 1.1 Class Sections
+Examples:
+- `X-A (2025–2026)`
+- `X-B (2025–2026)`
+- `IX-A (2025–2026)`
+
+Each class section represents **one class in one academic year**.
+
+---
+
+### 1.2 Students
+Each student has:
+- `name`
+- `roll_number` (must be **unique**)
+- `class_section`
+
+---
+
+### 1.3 Fee Components
+Individual fee heads such as:
+- Tuition
+- Transport
+- Lab Fee
+- Sports
+- Picnic
+
+These are **not bills** — they are building blocks.
+
+---
+
+### 1.4 Fee Plans
+A **bundle of fee components**.
+
+Example:
+- `Standard Plan 2025 (monthly)`
+
+---
+
+### 1.5 Fee Plan Components
+The amount of each component in a plan.
+
+Example:
+- Tuition → 2200
+- Transport → 700
+- Lab Fee → 150
+
+---
+
+### 1.6 Fee Assignments
+Links a **student to a fee plan**.
+
+Example:
+> “Anjali Singh → Standard Plan 2025”
+
+Without an assignment, invoices **cannot** be created.
+
+---
+
+### 1.7 Invoices
+Bills generated for a student for a given period.
+
+Example:
+- Invoice No: `INV-22`
+- Period: `2025-12`
+
+---
+
+### 1.8 Payments & Receipts
+- Payments are recorded against invoices
+- Each payment generates a **receipt**
+- Receipts have downloadable **PDFs**
+
+---
+
+### 1.9 Portal Accounts (Students / Parents)
+Login accounts that allow students/parents to:
+- View **only their own invoices**
+- View **only their own receipts**
+- Download PDFs
+
+---
+
+## 2. Correct Order of Operations (Very Important)
+
+Always follow this order:
+
+1. Class Sections  
+2. Students  
+3. Fee Components  
+4. Fee Plans  
+5. Fee Plan Components  
+6. Fee Assignments  
+7. Invoices  
+8. Payments  
+9. Receipts  
+
+> ✅ **Golden Rule**  
+> **No Fee Assignment → No Invoice**
+
+---
+
+## 3. Logging In as Admin
+
+1. Open the SchoolFlow URL
+2. Click **Login**
+3. Enter admin email and password
+4. Click **Login**
+
+Admins see:
+- Full navigation menu
+- Dashboard
+- Management pages
+
+If you only see **My Invoices / My Receipts**, you are logged in as a **student**, not admin.
+
+---
+
+## 4. Initial Data Setup Using CSV Import
+
+Recommended order for a new academic year:
+
+1. Import **Class Sections**
+2. Import **Students**
+3. Import **Fee Data (seed fees)**
+
+---
+
+### 4.1 Example: `class_sections.csv`
+
+```csv
+name,academic_year
+"X-A","2025-2026"
+"X-B","2025-2026"
+"IX-A","2025-2026"
+4.2 Example: students.csv
+name,roll_number,class_section_name,academic_year
+"Anjali Singh","1A-001","X-B","2025-2026"
+"Rahul Sharma","1A-002","X-B","2025-2026"
+Notes:
+
+roll_number must be unique
+
+class_section_name must already exist
+
+4.3 Example: seed_fees.csv
+Defines plans, components, amounts, and assignments.
+
+student_roll_number,plan_name,academic_year,frequency,component_name,component_amount
+"1A-001","Standard Plan 2025","2025-2026","monthly","Tuition",2200
+"1A-001","Standard Plan 2025","2025-2026","monthly","Transport",700
+"1A-001","Standard Plan 2025","2025-2026","monthly","Lab Fee",150
+After import, verify:
+
+Fee Components
+
+Fee Plans
+
+Fee Assignments
+
+5. Managing Data via Web Interface
+5.1 Students
+From Students page:
+
+Add / edit / delete students
+
+Create portal accounts
+
+Reset student email or password (admin only)
+
+6. Creating Portal Accounts for Students
+6.1 Create Portal User
+Go to Students
+
+Click Create Portal User
+
+Enter:
+
+Email
+
+Initial password
+
+Click Create
+
+After creation:
+
+Portal email appears in the list
+
+Student can log in immediately
+
+7. Resetting Student Email or Password (Admin)
+Admins can reset email and password.
+
+Steps:
+
+Go to Students
+
+Click Reset Password
+
+Update email and/or password
+
+Submit
+
+Student can log in using the new credentials.
+
+8. Creating Invoices
+8.1 Create Invoice
+Go to Invoices
+
+Click Create Invoice
+
+Enter:
+
+Student
+
+Invoice number
+
+Period
+
+Due date
+
+Submit
+
+System automatically:
+
+Pulls fee plan components
+
+Calculates totals
+
+Tracks balance
+
+9. Payments & Receipts
+9.1 Record Payment
+Open invoice
+
+Click Collect Payment
+
+Enter amount and mode
+
+Submit
+
+System:
+
+Records payment
+
+Updates balance
+
+Generates receipt PDF
+
+10. Emailing Invoices & Receipts
+10.1 Email Invoice
+Open invoice
+
+Click Email
+
+Email is pre-filled from student portal email
+
+Edit if required
+
+Click Send
+
+10.2 Email Receipt
+Same steps apply from the receipt list or detail page.
+
+11. Session & Security Notes
+Session token is stored in browser memory
+
+Closing the browser logs the user out
+
+Always click Logout on shared computers
+
+12. Year-Start Checklist (Admin)
+For each academic year:
+
+Create class sections
+
+Import or add students
+
+Define fee components
+
+Create fee plans
+
+Assign students to plans
+
+Generate invoices
+
+Record payments
+
+Create portal accounts
+
+🔒 CRITICAL ACCOUNTING DEFINITIONS (LOCKED)
+These definitions are non-negotiable and must be respected everywhere (DB, API, UI, PDFs):
+
+Concept	Meaning
+Base Amount	A flat amount manually added by the school
+Base Amount Description	Human explanation shown to parents
+Items	Fee plan components + admin line items
+Items Total	Sum of all items (including negative concession)
+Concession	Discount applied once, represented as a negative item
+Total Due	base_amount + items_total
+Paid Amount	Sum of all payments
+Balance	total_due - paid_amount

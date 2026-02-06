@@ -1,356 +1,341 @@
+<!-- help-student.md -->
 
-**File: `public/help-student.md`**
-```markdown
-<!-- README.student.md -->
-
-# SchoolFlow – Student / Parent Help
+# 🎓 SchoolFlow – Student / Parent Help
 
 This guide is for **students and parents** using the **SchoolFlow portal**.
 
 It explains how to:
 
 - Log in to SchoolFlow  
-- Understand the dashboard  
-- View your invoices  
+- Understand your dashboard  
+- View invoices  
 - Download invoice PDFs  
-- View your receipts  
-- Understand payments and balances
+- View receipts  
+- Download receipt PDFs  
+- Understand payments and balances  
+- Know what to do if something looks wrong  
+
+You **do not need any technical knowledge** to use SchoolFlow.
 
 ---
 
 ## 1. Logging In
 
-You should receive a **portal account** from your school with:
+Your school will provide you with a **portal account**, which includes:
 
-- A **login email** (for example, `anjali@example.com`)
+- A **login email** (for example: `anjali@example.com`)  
 - A **password**
 
 ### 1.1 Steps to Log In
 
-1. Open the SchoolFlow website (your school will give you the link).  
+1. Open the SchoolFlow website (the school will share the link).  
 2. Click **Login** in the top-right corner.  
 3. Enter your **Email** and **Password**.  
 4. Click **Login**.
 
-If everything is correct:
+If login is successful:
 
-- You will see the **student dashboard** with a welcome message.
-- The top-right will show your email and role (`Student` or `Parent`).
+- You will see your **student dashboard**.
+- The top-right corner will show your email and role (`Student` or `Parent`).
 
-If you see errors:
+### If Login Fails
 
-- “Login failed. Please check your credentials.”  
-  → Check that email and password match exactly (including upper/lower-case).  
-- If you have forgotten your password, contact the school office (admin) to reset it.
+- Check spelling of email and password (passwords are case-sensitive).
+- If you forgot your password or cannot log in:
+  - Contact the **school admin / accounts office**.
+  - Only the school can reset portal credentials.
 
 ---
 
 ## 2. Your Dashboard
 
-After logging in, you land on your **dashboard**.
+After logging in, you arrive at your **dashboard**.
 
-You will see:
+You may see:
 
-- A greeting, such as:
+- A welcome message, such as:
 
   > “Welcome, Anjali Singh”
 
-- A short description (e.g. “This is your SchoolFlow fee account.”)
+- A short description like:
+  > “This is your SchoolFlow fee account.”
 
-- Quick action buttons:
+- Summary cards showing:
+  - **Total Paid**
+  - **Outstanding Balance**
+  - **Receipts Issued**
+
+- Quick buttons:
   - **View My Invoices**
   - **View My Receipts**
 
-- Some summary boxes showing:
-  - **Total Paid**  
-  - **Outstanding Balance** (how much you still owe)  
-  - **Receipts Issued**
+You may also see a small **Recent Receipts** table.
 
-Below, you may see a small **Recent Receipts** table showing your latest payments and links to download receipts.
-
-> ✅ If your name doesn’t look correct in the dashboard, the school admin can update it in the system.
+> ✅ If your name looks incorrect, inform the school — they can fix it.
 
 ---
 
 ## 3. Viewing Your Invoices
 
-There are two ways to go to your invoices:
+You can access invoices in two ways:
 
-1. From the dashboard, click **View My Invoices**, **or**  
-2. Use the navbar link **My Invoices** (if visible).
+1. Click **View My Invoices** from the dashboard  
+2. Use **My Invoices** from the navigation menu
 
 ### 3.1 My Invoices Page
 
-On the **My Invoices** page, you will typically see a table with:
+This page lists all invoices created for you.
 
-- Invoice ID / Number  
+Typical columns include:
+
+- Invoice Number / ID  
 - Period (example: `2025-12`)  
-- Due date  
-- Total amount due  
-- Paid amount  
+- Due Date  
+- Total Amount  
+- Paid Amount  
 - Balance  
-- A link or button to **View** or **Open** the invoice
+- Action (View / Open)
 
-If the table is empty:
+If the list is empty:
 
-- The school may not have created any invoices for you yet, or  
-- Your portal account might not yet be linked to the correct student record.  
-  - In that case, contact the school office.  
+- The school may not have created invoices yet, **or**
+- Your portal account may not be linked correctly
+
+👉 In that case, contact the school office.
 
 ---
 
-## 4. Viewing Invoice Details & Downloading PDF
+## 4. Invoice Details & Invoice PDF
 
-To see a specific invoice in detail:
+Click an invoice to open the **invoice detail page**.
 
-1. Go to **My Invoices**.  
-2. Click on the **View** link or invoice number (depending on the UI).
+You will see:
 
-You will see the **invoice detail page**, which includes:
+- Invoice number  
+- Your name  
+- Period and due date  
+- **Line items**, such as:
+  - Tuition
+  - Transport
+  - Lab Fee
+  - Other charges
 
-- Invoice number and ID  
-- Your name (student name)  
-- The period (example: `2025-12`)  
-- Due date  
-- A **Line Items** table with:
-  - Description (e.g. `Tuition`, `Transport`, `Lab Fee`, `Picnic`, etc.)
-  - Amount for each item
+At the bottom:
 
-At the bottom, you will see totals:
-
-- **Items total** – sum of all fee items  
-- **Total due** – the full amount for this invoice  
-- **Paid** – amount already paid  
-- **Balance** – what you still owe for this invoice
+- **Items Total**
+- **Total Due**
+- **Paid**
+- **Balance**
 
 ### 4.1 Downloading / Viewing Invoice PDF
 
-On the invoice detail page, you will find a button like:
+On the invoice page, click:
 
 - **View PDF** or **Download PDF**
 
-Click it to open the official PDF invoice, which you can:
-
-- Save to your computer/phone  
-- Print, if needed  
-- Email or share for documentation
-
----
-
-## 5. Payments & Receipts
-
-Depending on how your school uses SchoolFlow:
-
-- You might pay fees **offline** (cash/cheque/bank transfer), and the school records the payment,  
-  **or**
-- There may be an **online payment** integration in the future (for now, assume offline).
-
-### 5.1 How Payments Show Up
-
-When a payment is recorded by the school:
-
-- Your invoice **Paid** amount increases.  
-- Your invoice **Balance** decreases.  
-- A **Receipt** is created in the system.
-- A **receipt PDF** becomes available.
-
-You can confirm payment status by looking at:
-
-- **My Invoices** page – check the `Paid` and `Balance` columns.  
-- The **invoice detail** page – check the totals.  
-- **My Receipts** page – see the list of receipts.
-
----
-
-## 6. Viewing Your Receipts
-
-To see all receipts issued to you:
-
-1. Click **My Receipts** in the navbar, or  
-2. Click **View My Receipts** from the dashboard.
-
-### 6.1 My Receipts Page
-
-You will see a table with:
-
-- Receipt No  
-- Invoice ID  
-- Amount  
-- Date/time issued  
-- Actions (usually **Download**)
-
-Each row is a **receipt** for a payment you made.
-
-### 6.2 Downloading a Receipt PDF
-
-In each receipt row:
-
-- Click **Download** (or similar link) to open the PDF receipt.
-
-The PDF usually includes:
-
-- Receipt number  
-- Invoice reference  
-- Your name  
-- Amount paid  
-- Date of payment  
-- School name and any notes
-
 You can:
 
-- Save the PDF  
-- Print it  
-- Share it for reimbursement or proof of payment
+- Save the PDF
+- Print it
+- Share it with parents or for records
 
 ---
 
-## 7. Understanding Your Balance
+## 5. Emailing Invoices (If Enabled by School)
 
-Your **outstanding balance** is the total amount you still need to pay.
+In some schools, invoices may also be **emailed directly**.
 
-It appears:
+- The school admin sends the invoice via email.
+- The email usually goes to the **portal email** on file.
+- If needed, the admin may change the recipient email before sending.
 
-- On the **dashboard** in “Outstanding Balance”  
-- Across your invoices (each invoice has its own balance)
+If you do not receive an expected invoice email:
 
-To understand what you owe:
-
-1. Check the **Outstanding Balance** on the dashboard.  
-2. Go to **My Invoices**:
-   - See which invoices are **paid**, **partially paid**, or **unpaid**.  
-3. For detailed breakdown:
-   - Click into each invoice to see line items and amounts.
-
-If you see something unexpected (for example, an invoice that you believe is paid):
-
-- Contact the school office and provide:
-  - Invoice number  
-  - Date and proof of payment (if needed)
+- Check spam/junk folder
+- Confirm your email with the school office
 
 ---
 
-## 8. Logging Out & Security
+## 6. Payments & Receipts
 
-### 8.1 Logging Out
+Payments are usually made **offline**, such as:
 
-To log out:
+- Cash  
+- Bank transfer  
+- Cheque  
+- UPI / NEFT  
 
-1. Click **Logout** in the top-right navbar.
+After payment, the **school records it** in SchoolFlow.
 
-You should do this whenever:
+### 6.1 What Happens After Payment
 
-- You are using a **shared computer** (e.g. in a cyber café, library, or school lab), or  
-- You finish checking your invoices/receipts.
+When payment is recorded:
 
-### 8.2 What Happens When You Close the Browser?
-
-SchoolFlow is configured so that:
-
-- When you **close the browser window**, your login session ends.
-- Next time you open the site, you will need to log in again.
-
-This is safer on shared or public computers.
-
-### 8.3 Good Security Habits
-
-- Do **not** share your password casually.  
-- If you suspect someone knows your password, ask the school admin to reset it.  
-- Always log out on shared devices.  
-- Avoid saving your password in browsers on public machines.
+- Invoice **Paid** amount increases  
+- Invoice **Balance** decreases  
+- A **Receipt** is generated  
+- A **receipt PDF** becomes available  
 
 ---
 
-## 9. Common Questions (FAQ)
+## 7. Viewing Your Receipts
 
-### Q1: My dashboard shows “Welcome, Student” instead of my name.
+To see receipts:
 
-That usually means:
+1. Click **View My Receipts** on the dashboard, or  
+2. Use **My Receipts** in the menu
 
-- Your portal account is not yet linked properly to your student record.
+### 7.1 My Receipts Page
 
-Solution:
+You will see:
 
-- Inform the school office.  
-- They can correct the link between your portal user and your student entry.
+- Receipt Number  
+- Invoice reference  
+- Amount paid  
+- Date  
+- Action (Download)
+
+Each receipt represents **one recorded payment**.
+
+### 7.2 Downloading Receipt PDF
+
+Click **Download** to open the receipt PDF.
+
+The PDF usually contains:
+
+- Receipt number  
+- Invoice number  
+- Student name  
+- Amount paid  
+- Payment date  
+- School details  
+
+You may save or print this for your records.
 
 ---
 
-### Q2: I logged in but “My Invoices” is empty.
+## 8. Understanding Your Balance
+
+Your **Outstanding Balance** is the amount you still need to pay.
+
+You can see it:
+
+- On the **dashboard**
+- On each invoice
+- Inside invoice detail view
+
+To understand dues:
+
+1. Check dashboard balance  
+2. Open **My Invoices**
+3. Look for:
+   - Unpaid invoices
+   - Partially paid invoices
+
+If something looks incorrect:
+
+- Note the **invoice number**
+- Contact the school accounts office
+
+---
+
+## 9. Logging Out & Security
+
+### 9.1 Logging Out
+
+Always log out when finished:
+
+1. Click **Logout** in the top-right corner
+
+This is especially important on shared computers.
+
+### 9.2 Browser Behavior
+
+- Closing the browser **ends your session**
+- Next visit requires logging in again
+
+This is for your safety.
+
+### 9.3 Good Security Practices
+
+- Do not share your password
+- Do not save passwords on public devices
+- Ask the school to reset credentials if needed
+
+---
+
+## 10. Common Questions (FAQ)
+
+### Q1: I see “Welcome, Student” instead of my name.
+
+This usually means your portal account is **not linked correctly**.
+
+✔ Solution:  
+Ask the school admin to check your portal linkage.
+
+---
+
+### Q2: My Invoices page is empty.
 
 Possible reasons:
 
-1. The school has not yet created any invoices for you.  
-2. Your portal account is not linked to the correct student record.  
+- Invoices are not created yet
+- Portal account is linked incorrectly
 
-Solution:
-
-- Confirm with school admin:
-  - That invoices exist for your roll number.  
-  - That your portal user is connected to the right student.
+✔ Solution:  
+Contact the school office.
 
 ---
 
-### Q3: I see an invoice, but the amounts look wrong.
+### Q3: Invoice amounts look incorrect.
 
-Possible reasons:
+Possible causes:
 
-- The fee plan set up for you is incorrect.  
-- You were assigned to the wrong fee plan.  
-- An extra line item was added in error.
+- Wrong fee plan
+- Incorrect assignment
+- Extra line item added by mistake
 
-Solution:
-
-- Note the **invoice number** and line items.  
-- Contact the school accounts team for clarification or corrections.
+✔ Solution:  
+Note invoice number and contact accounts team.
 
 ---
 
-### Q4: I paid, but the balance still shows as unpaid.
+### Q4: I paid, but balance is not updated.
 
-Possible reasons:
+Possible causes:
 
-- The payment has not yet been recorded in SchoolFlow.  
-- It was recorded under the wrong invoice or student.  
+- Payment not yet recorded
+- Recorded under wrong invoice
 
-Solution:
-
-- Share proof of payment and invoice number with the school.  
-- Ask them to confirm that:
-  - The payment has been recorded, and  
-  - It is linked to the correct invoice/student.
+✔ Solution:  
+Share payment proof with the school.
 
 ---
 
 ### Q5: Can I change my email or password myself?
 
-In the current design (depending on your school’s configuration):
+Currently:
 
-- You may **not** have direct access to change email/password in the portal.  
-- Instead, the school admin can:
-  - Change your portal email  
-  - Reset your password
+- Students **cannot change credentials directly**
+- School admin can:
+  - Reset password
+  - Update portal email
 
-Check with your school for the exact process.
-
----
-
-## 10. Summary
-
-As a student/parent, your main tasks in SchoolFlow are:
-
-1. **Log in** using your portal email & password.  
-2. Use the **Dashboard** to see your overall fee status.  
-3. Use **My Invoices** to:
-   - Review fee details  
-   - Check due dates  
-   - Download invoice PDFs  
-
-4. Use **My Receipts** to:
-   - Confirm recorded payments  
-   - Download receipt PDFs  
-
-5. **Log out** after use, especially on shared devices.
-
-If anything looks incorrect or confusing, your best contact is the **school admin / accounts office**, who uses the admin side of SchoolFlow and can update data as needed.
+Contact the school office for changes.
 
 ---
+
+## 11. Summary
+
+As a student or parent, you can:
+
+1. Log in securely  
+2. View invoices and balances  
+3. Download invoice PDFs  
+4. View and download receipts  
+5. Track payments  
+6. Contact the school if anything looks incorrect  
+
+SchoolFlow is designed so that **you only see your own data**, keeping your information private and secure.
+
+For any corrections or questions, your first point of contact is always the **school admin / accounts office**.
