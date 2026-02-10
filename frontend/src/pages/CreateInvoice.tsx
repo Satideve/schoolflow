@@ -1,4 +1,4 @@
-/* C:\coding_projects\dev\schoolflow\frontend\src\pages\CreateInvoice.tsx */
+// C:\coding_projects\dev\schoolflow\frontend\src\pages\CreateInvoice.tsx
 /**
  * Create invoice form (admin).
  *
@@ -17,6 +17,7 @@ import {
   useCreateInvoice,
   useStudents,
   useFeeAssignments,
+  useInvoices,
 } from "../api/queries";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ui/use-toast";
@@ -27,7 +28,7 @@ type FormValues = {
   student_id: string;
   period: string;
   due_date: string;
-  amount_due?: string; // base amount (optional)
+  amount_due?: string;
   base_amount_description?: string;
 };
 
@@ -41,8 +42,10 @@ export default function CreateInvoice() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { isSubmitting },
   } = useForm<FormValues>();
+
 
   const [items, setItems] = useState<LineItem[]>([]);
   const create = useCreateInvoice();
@@ -51,17 +54,18 @@ export default function CreateInvoice() {
 
   const { data: studentsData } = useStudents();
   const { data: assignmentsData } = useFeeAssignments();
+  const { data: invoicesData } = useInvoices();
 
-  // Watch the base amount field
+  // -------------------------
+  // Amount calculations
+  // -------------------------
+
   const baseAmountField = watch("amount_due") || "";
 
-  // Totals
   const itemsTotal = useMemo(() => {
     return items.reduce((sum, it) => {
       const n = Number(it.amount);
-      if (!Number.isNaN(n) && n > 0) {
-        return sum + n;
-      }
+      if (!Number.isNaN(n) && n > 0) return sum + n;
       return sum;
     }, 0);
   }, [items]);
@@ -71,7 +75,10 @@ export default function CreateInvoice() {
     return !Number.isNaN(n) && n > 0 ? n : 0;
   }, [baseAmountField]);
 
-  // Build student → object map
+  // -------------------------
+  // Student & assignment maps
+  // -------------------------
+
   const studentMap = useMemo(() => {
     const map = new Map<number, any>();
     (studentsData ?? []).forEach((s: any) => {
@@ -80,7 +87,6 @@ export default function CreateInvoice() {
     return map;
   }, [studentsData]);
 
-  // Build student → fee_assignment map
   const assignmentMap = useMemo(() => {
     const map = new Map<number, any>();
     (assignmentsData ?? []).forEach((a: any) => {
@@ -88,6 +94,43 @@ export default function CreateInvoice() {
     });
     return map;
   }, [assignmentsData]);
+
+  // -------------------------
+  // LAST invoice number
+  // -------------------------
+
+  const lastInvoiceNo = useMemo(() => {
+    if (!Array.isArray(invoicesData) || invoicesData.length === 0) return null;
+
+    const sorted = [...invoicesData].sort((a: any, b: any) => {
+      const ta = new Date(a.created_at ?? 0).getTime();
+      const tb = new Date(b.created_at ?? 0).getTime();
+      return tb - ta;
+    });
+
+    return sorted[0]?.invoice_no ?? null;
+  }, [invoicesData]);
+
+  // -------------------------
+  // Suggested next invoice no
+  // -------------------------
+
+  const suggestedInvoiceNo = useMemo(() => {
+    if (!lastInvoiceNo) return "";
+
+    const match = lastInvoiceNo.match(/(.*?)(\d+)$/);
+    if (!match) return "";
+
+    const prefix = match[1];
+    const num = Number(match[2]);
+    if (Number.isNaN(num)) return "";
+
+    return `${prefix}${num + 1}`;
+  }, [lastInvoiceNo]);
+
+  // -------------------------
+  // Line item handlers
+  // -------------------------
 
   const handleAddItem = () => {
     setItems((prev) => [...prev, { description: "", amount: "" }]);
@@ -104,45 +147,38 @@ export default function CreateInvoice() {
   ) => {
     setItems((prev) =>
       prev.map((it, i) =>
-        i === index
-          ? {
-              ...it,
-              [field]: value,
-            }
-          : it,
+        i === index ? { ...it, [field]: value } : it,
       ),
     );
   };
+
+  // -------------------------
+  // Submit (unchanged logic)
+  // -------------------------
 
   const onSubmit = async (values: FormValues) => {
     try {
       const studentId = Number(values.student_id);
 
-      // 1) Validate student ID is numeric
       if (!studentId || Number.isNaN(studentId)) {
         toast.push("Please enter a valid numeric student ID.");
         return;
       }
 
-      // 2) Check that the student exists
       if (!studentMap.has(studentId)) {
         toast.push(`Student ID ${studentId} does not exist.`);
         return;
       }
 
-      // 3) Check that the student has a fee assignment
       if (!assignmentMap.has(studentId)) {
         const student = studentMap.get(studentId);
-        const label = student?.name ?? `Student #${studentId}`;
         toast.push(
-          `${label} has no fee plan assignment. Please assign a fee plan first.`,
+          `${student?.name ?? `Student #${studentId}`} has no fee plan assignment.`,
         );
-        // Redirect to Fee Assignments page
         nav("/fee-assignments");
         return;
       }
 
-      // base payload (without totals logic)
       const payload: InvoiceCreateDTO = {
         invoice_no: values.invoice_no,
         student_id: studentId,
@@ -150,76 +186,94 @@ export default function CreateInvoice() {
         due_date: values.due_date,
       };
 
-      // Base amount (extra / top-up)
-      const base = baseAmount; // already sanitized via useMemo
-      if (base > 0) {
-        payload.amount_due = base;
-      } else {
-        payload.amount_due = null;
-      }
+      payload.amount_due = baseAmount > 0 ? baseAmount : null;
 
-      // Base amount description (optional)
       if (values.base_amount_description?.trim()) {
         (payload as any).base_amount_description =
           values.base_amount_description.trim();
       }
 
-      // Map local line items -> backend shape
       const line_items = items
         .map((it) => {
           const n = Number(it.amount);
           const desc = it.description?.trim() ?? "";
-          if (!desc || Number.isNaN(n) || n <= 0) {
-            return null;
-          }
-          return {
-            description: desc,
-            amount: n,
-          };
+          if (!desc || Number.isNaN(n) || n <= 0) return null;
+          return { description: desc, amount: n };
         })
-        .filter(
-          (it): it is { description: string; amount: number } => it !== null,
-        );
+        .filter(Boolean);
 
       if (line_items.length > 0) {
-        // Cast to any to satisfy TS if InvoiceCreateDTO doesn't declare line_items
         (payload as any).line_items = line_items;
       }
 
-      // console.log("invoice payload", payload);
-
       const data = await create.mutateAsync(payload);
-
       toast.push("Invoice created");
-
       nav(`/invoices/${data.id}`);
     } catch (err: any) {
-      console.error("create invoice error", err);
-
-      const message =
+      toast.push(
         err?.response?.data?.detail ??
-        "Unable to create invoice. Please check the form and try again.";
-
-      toast.push(`Create failed: ${message}`);
+          "Unable to create invoice. Please check the form and try again.",
+      );
     }
   };
+
+  // -------------------------
+  // UI
+  // -------------------------
 
   return (
     <div className="max-w-3xl mx-auto bg-white p-6 rounded shadow space-y-6">
       <h2 className="text-2xl font-semibold mb-2">Create Invoice</h2>
 
+      {lastInvoiceNo && (
+        <div className="mb-4 text-sm text-gray-600">
+          Last invoice number:{" "}
+          <span className="font-mono font-semibold">{lastInvoiceNo}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Core fields */}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium mb-1">
               Invoice No
             </label>
+
             <input
               {...register("invoice_no", { required: true })}
-              placeholder="INV-2025-001"
-              className="w-full border p-2 rounded"
+              placeholder={suggestedInvoiceNo || "Enter invoice number"}
+              className="w-full border p-2 rounded placeholder:text-gray-400"
             />
+
+            {suggestedInvoiceNo && (
+              <p className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                Suggested next number:
+                <span className="font-mono">{suggestedInvoiceNo}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(suggestedInvoiceNo);
+
+                      // 👇 THIS is the key line
+                      setValue("invoice_no", suggestedInvoiceNo, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      });
+
+                      toast.push(`Copied: ${suggestedInvoiceNo}`);
+                    } catch (err) {
+                      console.error("Clipboard copy failed", err);
+                      toast.push("Failed to copy invoice number");
+                    }
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Copy
+                </button>
+
+              </p>
+            )}
           </div>
 
           <div>
