@@ -14,6 +14,9 @@ const baseURL = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const api = axios.create({
   baseURL,
   withCredentials: false,
+  headers: {
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 /**
