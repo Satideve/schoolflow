@@ -38,12 +38,10 @@ class SMTPMessagingAdapter(MessagingInterface):
         else:
             # Dev mode: NEVER allow real SMTP credentials
             # Force MailHog-style behavior
-            if settings.smtp_host not in ("localhost", "127.0.0.1"):
+            if settings.smtp_host not in ("localhost", "127.0.0.1", "mailhog"):
                 raise RuntimeError(
-                    "SMTP_MODE=dev but SMTP_HOST is not localhost"
+                    "SMTP_MODE=dev requires SMTP_HOST to be localhost or mailhog"
                 )
-
-
             
         msg = MIMEMultipart("mixed")
         msg["From"] = settings.smtp_from

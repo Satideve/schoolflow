@@ -19,15 +19,16 @@ if str(database_url).startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
 # Create engine with future flag
+from sqlalchemy.pool import NullPool
+
 engine = create_engine(
     database_url,
     future=True,
     connect_args=connect_args,
-    pool_pre_ping=True,   # 🔴 critical for Neon
-    pool_size=5,          # safe default for free tier
-    max_overflow=5,
-    pool_timeout=30,
+    pool_pre_ping=True,
+    poolclass=NullPool,
 )
+
 
 # DEBUG: print engine/url and current ENV so we can trace import-time DB selection (keeps appearing in pytest logs)
 print("=== IMPORT-TIME DB DEBUG ===", file=sys.stderr, flush=True)

@@ -64,7 +64,7 @@ class Settings(BaseSettings):
         env="CORS_ALLOW_METHODS",
     )
     cors_allow_headers: List[str] = Field(
-        default_factory=lambda: ["Authorization", "Content-Type"],
+        default_factory=lambda: ["*"],
         env="CORS_ALLOW_HEADERS",
     )
 

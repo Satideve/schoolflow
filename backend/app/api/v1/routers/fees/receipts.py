@@ -376,6 +376,7 @@ def email_receipt(
 @router.get("/{receipt_id}/download", response_class=FileResponse)
 def download_receipt_pdf(
     receipt_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Security(get_current_user),
 ):
@@ -477,8 +478,11 @@ def download_receipt_pdf(
 
 
     filename = os.path.basename(str(fp))
-    return FileResponse(
+    response = FileResponse(
         path=str(fp),
         media_type="application/pdf",
         filename=filename,
     )
+
+    return response
+

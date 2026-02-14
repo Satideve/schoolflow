@@ -12,7 +12,7 @@ export async function downloadWithAuth(
 
   const res = await fetch(url, {
     headers,
-    credentials: "include", // always allow cookie-based auth
+    credentials: "omit", // 🔑 token-based auth only
   });
 
   if (!res.ok) {

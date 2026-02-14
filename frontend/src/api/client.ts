@@ -7,16 +7,17 @@ import axios from "axios";
  */
 const baseURL = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-/**
- * Axios instance:
- * - withCredentials: true allows cookie-based auth (backend supports both token + cookie)
- */
 const api = axios.create({
   baseURL,
   withCredentials: false,
   headers: {
     "ngrok-skip-browser-warning": "true",
   },
+});
+
+api.interceptors.request.use((config) => {
+  config.withCredentials = false;
+  return config;
 });
 
 /**

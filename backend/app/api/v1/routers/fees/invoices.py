@@ -382,11 +382,14 @@ def download_invoice(
         )
 
     # At this point, either we have a freshly rendered file, or we fall back to an existing one.
-    return FileResponse(
+    response = FileResponse(
         path=str(pdf_path),
         media_type="application/pdf",
         filename=filename,
     )
+
+    return response
+
 
 class InvoiceEmailRequest(BaseModel):
     to_email: str
