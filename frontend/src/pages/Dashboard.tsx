@@ -498,12 +498,6 @@ const Dashboard: React.FC = () => {
   const { user, authReady } = useAuth();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (authReady && user) {
-      queryClient.invalidateQueries();
-    }
-  }, [authReady, user, queryClient]);
-
   if (!authReady) {
     return (
       <div className="text-slate-500 text-sm">
