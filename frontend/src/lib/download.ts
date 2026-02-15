@@ -12,8 +12,10 @@ export async function downloadWithAuth(
 
   const res = await fetch(url, {
     headers,
-    credentials: "omit", // 🔑 token-based auth only
+    credentials: "omit",
+    mode: "cors", // 🔒 force non-credentialed CORS
   });
+
 
   if (!res.ok) {
     throw new Error(`Download failed: ${res.status}`);
