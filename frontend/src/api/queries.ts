@@ -633,7 +633,7 @@ export function useDeleteInvoiceLineItem() {
    LIST RECEIPTS
 ------------------------------------------------------- */
 export function useReceipts() {
-  const { authReady, user } = useAuth();
+  const { authReady, user, token } = useAuth();
 
   return useQuery({
     queryKey: ["receipts"],
@@ -641,7 +641,7 @@ export function useReceipts() {
       const { data } = await api.get("/api/v1/receipts/");
       return data;
     },
-    enabled: authReady && !!user,
+    enabled: authReady && !!user && !!token,
     refetchOnWindowFocus: false,
     retry: false,
   });
