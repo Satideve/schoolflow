@@ -307,10 +307,10 @@ def read_invoice(
 
 @router.get(
     "/{invoice_id}/download",
-    response_class=FileResponse,
     status_code=status.HTTP_200_OK,
     summary="Download the invoice PDF",
 )
+
 def download_invoice(
     invoice_id: int,
     request: Request,
@@ -381,12 +381,32 @@ def download_invoice(
             detail=f"Unable to render invoice PDF: {render_error}",
         )
 
+    # Hard validation: ensure we are serving a real PDF
+    try:
+        if pdf_path.stat().st_size < 100:
+            raise ValueError("PDF file too small (likely render failure)")
+
+        with open(pdf_path, "rb") as f:
+            header = f.read(5)
+
+        if header != b"%PDF-":
+            raise ValueError("Rendered file is not a valid PDF")
+
+    except Exception as e:
+        logger.error("Invalid PDF for invoice %s: %s", inv.invoice_no, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Generated invoice PDF is invalid",
+        )
+
     # At this point, either we have a freshly rendered file, or we fall back to an existing one.
     response = FileResponse(
         path=str(pdf_path),
         media_type="application/pdf",
         filename=filename,
     )
+
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
 
     origin = request.headers.get("origin")
 
