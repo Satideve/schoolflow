@@ -406,13 +406,12 @@ def download_invoice(
         filename=filename,
     )
 
-    # 🔒 CRITICAL: prevent gzip/br corruption via proxies (Vercel/ngrok)
+    # 🔒 Prevent gzip / proxy corruption
     response.headers["Content-Encoding"] = "identity"
     response.headers["Cache-Control"] = "no-store, no-transform"
     response.headers["X-Content-Type-Options"] = "nosniff"
 
-    # Explicit content length (important for some proxies)
-    response.headers["Content-Length"] = str(pdf_path.stat().st_size)
+    # ✅ DO NOT set Content-Length manually
 
     # Force download
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -424,9 +423,6 @@ def download_invoice(
         response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
-
-
-
 
 class InvoiceEmailRequest(BaseModel):
     to_email: str
