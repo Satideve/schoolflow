@@ -39,30 +39,31 @@ def create_app() -> FastAPI:
     )
 
     # --- CORS: compute allowed origins for runtime
-    # Preserve existing behavior while ensuring local frontend dev origin
-    # is accepted when not explicitly set in configuration.
-    #
-    # Best practice: set explicit cors_origins in config / .env for prod.
-    local_dev_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
-    configured_origins = settings.cors_origins or []
+    # --- CORS (STRICT, TOKEN-BASED, NO WILDCARDS) -----------------------
 
-    # If configured_origins is a string in settings, ensure we handle it
-    if isinstance(configured_origins, str):
-        configured_origins = [configured_origins]
+    FRONTEND_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://schoolflow-frontend.vercel.app",
+    ]
 
-    # Combine configured origins with local dev ones (avoid duplicates)
-    allow_origins = (
-        list(dict.fromkeys([*configured_origins, *local_dev_origins]))
-        if configured_origins
-        else local_dev_origins
-    )
+    # Take env origins but REMOVE '*' explicitly
+    env_origins = settings.cors_origins or []
+    safe_env_origins = [
+        o for o in env_origins if o and o != "*"
+    ]
+
+    allow_origins = list(dict.fromkeys([
+        *safe_env_origins,
+        *FRONTEND_ORIGINS,
+    ]))
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
-        allow_credentials=settings.cors_allow_credentials,
-        allow_methods=settings.cors_allow_methods,
-        allow_headers=settings.cors_allow_headers,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # Request-ID Middleware: assign or propagate X-Request-ID

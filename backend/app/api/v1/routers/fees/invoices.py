@@ -388,7 +388,14 @@ def download_invoice(
         filename=filename,
     )
 
+    origin = request.headers.get("origin")
+
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+
     return response
+
 
 
 class InvoiceEmailRequest(BaseModel):

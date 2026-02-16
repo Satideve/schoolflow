@@ -58,7 +58,7 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: List[str] = Field(default_factory=list, env="CORS_ORIGINS")        
-    cors_allow_credentials: bool = Field(True, env="CORS_ALLOW_CREDENTIALS")
+    cors_allow_credentials: bool = False
     cors_allow_methods: List[str] = Field(
         default_factory=lambda: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         env="CORS_ALLOW_METHODS",
