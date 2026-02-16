@@ -406,15 +406,25 @@ def download_invoice(
         filename=filename,
     )
 
+    # 🔒 CRITICAL: prevent gzip/br corruption via proxies (Vercel/ngrok)
+    response.headers["Content-Encoding"] = "identity"
+    response.headers["Cache-Control"] = "no-store, no-transform"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Explicit content length (important for some proxies)
+    response.headers["Content-Length"] = str(pdf_path.stat().st_size)
+
+    # Force download
     response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
 
+    # CORS (keep exactly as-is)
     origin = request.headers.get("origin")
-
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
+
 
 
 
