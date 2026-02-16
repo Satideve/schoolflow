@@ -41,3 +41,5 @@ export function setAuthToken(token?: string) {
   }
 }
 
+export default api;
+
