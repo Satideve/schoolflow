@@ -1,30 +1,57 @@
 // src/lib/download.ts
 
 /**
- * Production-safe PDF download.
+ * Token-based, proxy-safe PDF download.
  *
- * IMPORTANT:
- * - Do NOT use fetch / blob / axios for PDFs
- * - Let the browser stream the file natively
- * - This avoids corruption on Vercel / ngrok / proxies
+ * DESIGN DECISIONS:
+ * - Auth is strictly Bearer-token based (no cookies).
+ * - Download uses fetch + blob so Authorization header is always sent.
+ * - credentials: "omit" prevents proxy / CORS corruption.
+ * - This works reliably on localhost, ngrok, and Vercel.
  */
-export function downloadWithAuth(
+export async function downloadWithAuth(
   url: string,
-  _filename?: string,
+  filename: string,
 ) {
   const token = localStorage.getItem("access_token");
 
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: "omit", // 🔒 critical: no cookies, no proxy mutation
+    mode: "cors",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Download failed: ${res.status} ${text}`);
+  }
+
+  const blob = await res.blob();
+
+  // Defensive check (helps catch proxy/auth issues early)
+  if (blob.size < 100) {
+    throw new Error("Downloaded file is invalid or empty");
+  }
+
+  const blobUrl = window.URL.createObjectURL(blob);
+
   const a = document.createElement("a");
-
-  // Pass auth via header using same-origin cookies OR Authorization header already set
-  // Backend already supports Authorization: Bearer
-  a.href = url;
-
-  // Open in new tab so browser handles binary stream directly
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
+  a.href = blobUrl;
+  a.download = filename;
 
   document.body.appendChild(a);
   a.click();
   a.remove();
+
+  // Delay revocation for slower environments (Vercel)
+  setTimeout(() => {
+    window.URL.revokeObjectURL(blobUrl);
+  }, 1000);
 }
