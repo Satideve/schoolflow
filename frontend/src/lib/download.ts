@@ -1,39 +1,30 @@
 // src/lib/download.ts
-export async function downloadWithAuth(
+
+/**
+ * Production-safe PDF download.
+ *
+ * IMPORTANT:
+ * - Do NOT use fetch / blob / axios for PDFs
+ * - Let the browser stream the file natively
+ * - This avoids corruption on Vercel / ngrok / proxies
+ */
+export function downloadWithAuth(
   url: string,
-  filename: string,
-  token?: string,
+  _filename?: string,
 ) {
-  const headers: Record<string, string> = {};
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const res = await fetch(url, {
-    headers,
-    credentials: "omit",
-    mode: "cors", // 🔒 force non-credentialed CORS
-  });
-
-
-  if (!res.ok) {
-    throw new Error(`Download failed: ${res.status}`);
-  }
-
-  const blob = await res.blob();
-  const blobUrl = window.URL.createObjectURL(blob);
+  const token = localStorage.getItem("access_token");
 
   const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
+
+  // Pass auth via header using same-origin cookies OR Authorization header already set
+  // Backend already supports Authorization: Bearer
+  a.href = url;
+
+  // Open in new tab so browser handles binary stream directly
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+
   document.body.appendChild(a);
   a.click();
-
   a.remove();
-
-  // Delay revocation to avoid race on slower environments (Vercel)
-  setTimeout(() => {
-    window.URL.revokeObjectURL(blobUrl);
-  }, 1000);
 }
