@@ -373,7 +373,7 @@ def email_receipt(
     return {"status": "sent"}
 
 
-@router.get("/{receipt_id}/download", response_class=FileResponse)
+@router.get("/{receipt_id}/download")
 def download_receipt_pdf(
     receipt_id: int,
     request: Request,
@@ -477,20 +477,29 @@ def download_receipt_pdf(
             )
 
 
+    from fastapi import Response
+
     filename = os.path.basename(str(fp))
-    response = FileResponse(
-        path=str(fp),
+
+    with open(fp, "rb") as f:
+        pdf_bytes = f.read()
+
+    response = Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename=filename,
     )
 
-    # return response
-    origin = request.headers.get("origin")
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.headers["Content-Length"] = str(len(pdf_bytes))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
 
+    # CORS (keep behavior identical)
+    origin = request.headers.get("origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
-        
+
 

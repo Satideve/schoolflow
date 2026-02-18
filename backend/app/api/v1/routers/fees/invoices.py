@@ -400,29 +400,29 @@ def download_invoice(
         )
 
     # At this point, either we have a freshly rendered file, or we fall back to an existing one.
-    response = FileResponse(
-        path=str(pdf_path),
+    from fastapi import Response
+
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    response = Response(
+        content=pdf_bytes,
         media_type="application/pdf",
-        filename=filename,
     )
 
-    # 🔒 Prevent gzip / proxy corruption
-    response.headers["Content-Encoding"] = "identity"
-    response.headers["Cache-Control"] = "no-store, no-transform"
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.headers["Content-Length"] = str(len(pdf_bytes))
+    response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
 
-    # ✅ DO NOT set Content-Length manually
-
-    # Force download
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-
-    # CORS (keep exactly as-is)
+    # CORS (keep behavior identical)
     origin = request.headers.get("origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
 
     return response
+
 
 class InvoiceEmailRequest(BaseModel):
     to_email: str

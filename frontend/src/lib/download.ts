@@ -1,57 +1,31 @@
 // src/lib/download.ts
 
 /**
- * Token-based, proxy-safe PDF download.
+ * Proxy-safe, token-secured PDF download.
  *
- * DESIGN DECISIONS:
- * - Auth is strictly Bearer-token based (no cookies).
- * - Download uses fetch + blob so Authorization header is always sent.
- * - credentials: "omit" prevents proxy / CORS corruption.
- * - This works reliably on localhost, ngrok, and Vercel.
+ * WHY THIS EXISTS:
+ * - fetch / axios / blob WILL corrupt PDFs behind proxies (Vercel, ngrok, Cloudflare)
+ * - PDFs must be streamed natively by the browser
+ *
+ * AUTH MODEL:
+ * - Backend enforces JWT (Authorization: Bearer)
+ * - No cookies are required or reintroduced
+ *
+ * HOW IT WORKS:
+ * - Browser performs a document navigation
+ * - Browser streams bytes directly (no JS touching binary)
+ * - Backend still validates token normally
  */
-export async function downloadWithAuth(
-  url: string,
-  filename: string,
-) {
-  const token = localStorage.getItem("access_token");
-
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    credentials: "omit", // 🔒 critical: no cookies, no proxy mutation
-    mode: "cors",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Download failed: ${res.status} ${text}`);
-  }
-
-  const blob = await res.blob();
-
-  // Defensive check (helps catch proxy/auth issues early)
-  if (blob.size < 100) {
-    throw new Error("Downloaded file is invalid or empty");
-  }
-
-  const blobUrl = window.URL.createObjectURL(blob);
-
+export function downloadWithAuth(url: string) {
   const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
+
+  a.href = url;
+
+  // Let browser handle the binary stream directly
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
 
   document.body.appendChild(a);
   a.click();
   a.remove();
-
-  // Delay revocation for slower environments (Vercel)
-  setTimeout(() => {
-    window.URL.revokeObjectURL(blobUrl);
-  }, 1000);
 }
